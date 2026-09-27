@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gym Log</title>
+<meta name="theme-color" content="#0e0f12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <button id="back" class="icon-btn" aria-label="Quay lại" onclick="back()">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <h1 id="title"></h1>
+    <span id="sync" title="Đồng bộ"></span>
+  </header>
+  <main id="screen"></main>
+  <button id="fab" aria-label="Thêm"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span></span></button>
+  <nav id="tabs">
+    <span id="tab-ind"></span>
+    <button data-tab="home"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><b>Trang chủ</b></button>
+    <button data-tab="workout"><svg viewBox="0 0 24 24"><path d="M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12"/></svg><b>Tập luyện</b></button>
+    <button data-tab="food"><svg viewBox="0 0 24 24"><path d="M4 12h16a8 8 0 01-16 0zM8 8c0-2 2-2 2-4M13 8c0-2 2-2 2-4"/></svg><b>Dinh dưỡng</b></button>
+    <button data-tab="progress"><svg viewBox="0 0 24 24"><path d="M4 19h16M6 15l4-4 3 3 5-6"/></svg><b>Tiến độ</b></button>
+    <button data-tab="me"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg><b>Cá nhân</b></button>
+  </nav>
+</div>
+<div id="sheet-wrap" onclick="if(event.target===this)closeSheet()"><div id="sheet"></div></div>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
