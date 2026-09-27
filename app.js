@@ -77,8 +77,8 @@ function applyLocal(o) {
   else if (i >= 0) list[i] = { ...o.row }; else list.push({ ...o.row });
 }
 function commit(o) { applyLocal(o); if (AUTH?.api) QUEUE.push(o); save(); queueSync(); } // offline thuần: không cần hàng đợi
-const put = (sheet, row) => commit({ op: 'put', sheet, row });
-const del = (sheet, id) => commit({ op: 'del', sheet, row: { id } });
+function put(sheet, row) { commit({ op: 'put', sheet, row }); }
+function del(sheet, id) { commit({ op: 'del', sheet, row: { id } }); }
 
 async function api(body) {
   const r = await fetch(AUTH.api, { method: 'POST', body: JSON.stringify({ ...body, key: AUTH.key }) }); // text/plain → không preflight CORS
