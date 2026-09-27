@@ -112,10 +112,29 @@ function setProf(k, v) { const p = { ...prof(), [k]: v }; put('Settings', { id: 
 const weights = () => rows('WeightLog').slice().sort((a, b) => a.date < b.date ? -1 : 1);
 const lastWeight = () => weights().at(-1)?.kg || 0;
 const ACT = { low: 1.375, mid: 1.55, high: 1.725 }; // hệ số vận động
+const METAB = { slow: 0.93, normal: 1, fast: 1.07 }; // trao đổi chất tự khai: ±7% so với công thức
+const FAT_SHARE = { ecto: 0.22, meso: 0.25, endo: 0.3 }; // tạng người: ecto nhiều carb hơn, endo ít carb hơn
+const metabOf = p => p.metab || { ecto: 'fast', endo: 'slow' }[p.body] || 'normal';
+// Đo mức tiêu hao THẬT: calo ăn trung bình − (xu hướng cân nặng × 7700) trong 21 ngày gần nhất
+function measuredTdee() {
+  const end = today(), start = addDays(end, -21);
+  const ws = weights().filter(w => w.date >= start);
+  const days = [...new Set(rows('NutritionLog').filter(r => r.date >= start && r.date < end).map(r => r.date))];
+  const need = { days: days.length, weighs: ws.length };
+  if (days.length < 10 || ws.length < 4) return need;
+  const xs = ws.map(w => (new Date(w.date) - new Date(start)) / 864e5), ys = ws.map(w => w.kg);
+  const mx = xs.reduce((a, b) => a + b) / xs.length, my = ys.reduce((a, b) => a + b) / ys.length;
+  const slope = xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / (xs.reduce((a, x) => a + (x - mx) ** 2, 0) || 1); // kg/ngày
+  const intake = days.reduce((a, d) => a + eaten(d).kcal, 0) / days.length;
+  const tdee = intake - slope * 7700;
+  return tdee > 1200 && tdee < 5000 ? { ...need, tdee: Math.round(tdee), intake: Math.round(intake), slope } : need;
+}
 function targets() {
   const p = prof(), w = lastWeight() || 65, tk = +p.targetKg || 0;
   const bmr = 10 * w + 6.25 * (+p.height || 170) - 5 * (+p.age || 25) + (p.sex === 'f' ? -161 : 5); // Mifflin-St Jeor
-  const tdee = bmr * (ACT[p.activity] || ACT.mid);
+  const formula = bmr * (ACT[p.activity] || ACT.mid) * METAB[metabOf(p)];
+  const real = measuredTdee();
+  const tdee = p.useReal && real.tdee ? real.tdee : formula;
   const diff = tk ? tk - w : 0;
   const goal = tk ? (diff > 0.5 ? 'bulk' : diff < -0.5 ? 'cut' : 'maintain') : (p.goal || 'maintain');
   const pace = +p.pace || (goal === 'bulk' ? 0.25 : 0.5); // kg/tuần
@@ -124,9 +143,9 @@ function targets() {
   const auto = Math.round(Math.max(tdee + adj, goal === 'cut' ? floor : 0) / 10) * 10;
   const kcal = +p.kcal || auto;
   const protein = Math.round(w * { bulk: 1.8, cut: 2.2, maintain: 1.6 }[goal]);
-  const fat = Math.round(kcal * 0.25 / 9);
+  const fat = Math.round(kcal * (FAT_SHARE[p.body] || 0.25) / 9);
   const weeks = goal === 'maintain' || !tk ? 0 : Math.ceil(Math.abs(diff) / pace);
-  return { kcal, auto, protein, fat, carb: Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)), tdee: Math.round(tdee), goal, pace, diff, weeks, floored: goal === 'cut' && tdee + adj < floor };
+  return { kcal, auto, protein, fat, carb: Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)), tdee: Math.round(tdee), formula: Math.round(formula), real, goal, pace, diff, weeks, floored: goal === 'cut' && tdee + adj < floor };
 }
 // Gợi ý món Việt bù phần dinh dưỡng còn thiếu trong ngày
 const NOT_SUGGEST = /Bia|Trà sữa|Nước mía|Cà phê|Mì gói|Chả giò/;
@@ -289,7 +308,11 @@ function chart(pts, small) { // pts: [{x: 'yyyy-mm-dd', y}]
     ${small ? '' : `<line x1="${P}" x2="${Wd - P}" y1="${P}" y2="${P}"/><line x1="${P}" x2="${Wd - P}" y1="${H - P}" y2="${H - P}"/><text x="${P}" y="${P - 6}">${nf(hi)}</text><text x="${P}" y="${H - P + 14}">${nf(lo)}</text><text x="${Wd - P}" y="${H - P + 14}" text-anchor="end">${dm(pts.at(-1).x)}</text><text x="${P + 40}" y="${H - P + 14}">${dm(pts[0].x)}</text>`}
     <path class="a" d="${d}L${lx} ${H}L${xy[0][0]} ${H}Z"/><path class="l" d="${d}"/><circle cx="${lx}" cy="${ly}" r="${small ? 3 : 4.5}"/></svg>`;
 }
-const seg = (opts, val, fn) => `<div class="seg">${opts.map(([k, l]) => `<button class="${k === val ? 'on' : ''}" onclick="${fn}('${k}')">${l}</button>`).join('')}</div>`;
+const SEGI = {}; // vị trí cũ của từng nhóm nút → nền trượt từ chỗ cũ sang chỗ mới
+const seg = (opts, val, fn) => {
+  const i = opts.findIndex(([k]) => k === val), from = SEGI[fn] ?? i; SEGI[fn] = i;
+  return `<div class="seg" style="--n:${opts.length};--i:${i};--from:${from}">${i >= 0 ? '<i class="knob"></i>' : ''}${opts.map(([k, l]) => `<button class="${k === val ? 'on' : ''}" onclick="${fn}('${k}')">${l}</button>`).join('')}</div>`;
+};
 const empty = (msg, icon = IC.dumb) => `<div class="empty">${icon}<div>${msg}</div></div>`;
 
 // ===== Màn hình =====
@@ -403,7 +426,7 @@ function removeEx(day, i) { const s = sched(day), ids = schedIds(s); ids.splice(
 function startSession(day) {
   const td = today(); if (session(td)) return;
   put('Sessions', { id: 's' + td, date: td, name: sched(day).name || DAYS[day], start: nowTime(), end: '' });
-  draw(); toast('Bắt đầu! Chúc buổi tập tốt');
+  draw(); burst(); toast('Bắt đầu! Chúc buổi tập tốt');
 }
 function endSession() {
   const s = session(today()); if (!s) return;
@@ -460,8 +483,8 @@ function saveSet(f, id) {
   put('WorkoutLog', { id: lastSaved, date: td, exercise: id, set: n + 1, reps, kg, rpe });
   draw();
   if (before.kg && (kg > before.kg.kg || e1rm(kg, reps) > e1rm(before.e1.kg, before.e1.reps) + 0.01)) {
-    toast(`🏆 Kỷ lục mới: ${W(kg)} × ${reps}`, 'pr'); navigator.vibrate?.([30, 40, 30]);
-  } else { toast(`Set ${n + 1} đã lưu`); navigator.vibrate?.(15); }
+    toast(`🏆 Kỷ lục mới: ${W(kg)} × ${reps}`, 'pr'); navigator.vibrate?.([30, 40, 30]); burst(18, true);
+  } else { toast(`Set ${n + 1} đã lưu`); navigator.vibrate?.(15); burst(); }
   return false;
 }
 function delSet(rid) { del('WorkoutLog', rid); draw(); }
@@ -639,7 +662,7 @@ function weightSheet() {
 function saveWeight(f) {
   const date = f.date.value;
   put('WeightLog', { id: 'w' + date, date, time: f.time.value, kg: Math.round(fromU(+f.kg.value) * 100) / 100 }); // 1 số/ngày, khai báo lại trong ngày sẽ ghi đè
-  closeSheet(); draw(); toast('Đã lưu cân nặng'); return false;
+  closeSheet(); draw(); burst(); toast('Đã lưu cân nặng'); return false;
 }
 function bodySheet() {
   const l = rows('BodyMeasurement').slice().sort((a, b) => a.date < b.date ? -1 : 1).at(-1) || {};
@@ -690,6 +713,17 @@ V.me = () => {
         <label class="field"><span>Cân nặng mục tiêu (${unit()})</span><input class="in" type="number" inputmode="decimal" step="0.5" value="${p.targetKg ? +toU(p.targetKg).toFixed(1) : ''}" placeholder="VD: 75" onchange="setProf('targetKg',this.value?Math.round(fromU(+this.value)*10)/10:'');draw()"></label>
         ${t.goal !== 'maintain' && p.targetKg ? `<div class="field"><span class="label" style="display:block;margin-bottom:4px">Tốc độ ${t.goal === 'bulk' ? 'tăng' : 'giảm'} mỗi tuần</span>${seg(t.goal === 'bulk' ? [['0.25', 'Chậm 0,25kg'], ['0.5', 'Nhanh 0,5kg']] : [['0.25', 'Nhẹ 0,25kg'], ['0.5', 'Vừa 0,5kg'], ['0.75', 'Nhanh 0,75kg']], String(t.pace), 'setProf_pace')}</div>` : ''}
         <div class="field"><span class="label" style="display:block;margin-bottom:4px">Mức vận động ngoài giờ tập</span>${seg([['low', 'Ít (văn phòng)'], ['mid', 'Vừa'], ['high', 'Nhiều']], p.activity || 'mid', 'setProf_activity')}</div>
+        <div class="field"><span class="label" style="display:block;margin-bottom:4px">Tạng người</span>${seg([['ecto', 'Ecto · gầy'], ['meso', 'Meso · cân đối'], ['endo', 'Endo · dễ béo']], p.body || '', 'setProf_body')}
+          <div class="muted" style="font-size:13px;margin-top:-8px">${{ ecto: 'Khung nhỏ, khó tăng cân → mặc định trao đổi chất nhanh, nhiều carb hơn (fat 22%).', meso: 'Dễ lên cơ, dáng cân đối → giữ tỷ lệ chuẩn (fat 25%).', endo: 'Dễ tích mỡ → mặc định trao đổi chất chậm, bớt carb (fat 30%).' }[p.body] || 'Chọn tạng gần giống bạn nhất. Đây là điểm xuất phát, app sẽ hiệu chỉnh bằng dữ liệu thật.'}</div></div>
+        <div class="field"><span class="label" style="display:block;margin-bottom:4px">Trao đổi chất</span>${seg([['slow', 'Chậm'], ['normal', 'Bình thường'], ['fast', 'Nhanh']], metabOf(p), 'setProf_metab')}
+          <div class="muted" style="font-size:13px;margin-top:-8px">${{ slow: 'Ăn ít vẫn khó giảm → tính thấp hơn công thức 7%.', normal: 'Theo công thức chuẩn Mifflin-St Jeor.', fast: 'Ăn nhiều vẫn khó tăng → tính cao hơn công thức 7%.' }[metabOf(p)]}</div></div>
+        <div class="card coach" style="background:var(--card2);box-shadow:none;margin:0 0 16px">
+          <div class="label" style="margin-bottom:4px">Trao đổi chất thực tế của bạn</div>
+          ${t.real.tdee ? `<div>Theo 21 ngày gần nhất (ăn trung bình ${nf(t.real.intake, 0)} kcal, cân ${t.real.slope >= 0 ? 'tăng' : 'giảm'} ${nf(Math.abs(t.real.slope * 7), 2)} kg/tuần), cơ thể bạn đốt khoảng <b>${nf(t.real.tdee, 0)} kcal/ngày</b>.</div>
+            <div class="muted" style="font-size:14px;margin-top:4px">${(() => { const d = (t.real.tdee / (t.formula / METAB[metabOf(p)]) - 1) * 100; return Math.abs(d) < 5 ? 'Gần đúng công thức chuẩn → trao đổi chất bình thường.' : `${d > 0 ? 'Cao' : 'Thấp'} hơn công thức chuẩn ${nf(Math.abs(d), 0)}% → trao đổi chất <b style="color:var(--text)">${d > 0 ? 'nhanh' : 'chậm'}</b>.`; })()}</div>
+            <button class="btn sm ${p.useReal ? '' : 'soft'}" style="margin-top:10px" onclick="setProf('useReal',${p.useReal ? 'false' : 'true'});draw()">${p.useReal ? '✓ Đang dùng số thực tế' : 'Dùng số thực tế để tính calo'}</button>`
+          : `<div class="muted" style="font-size:14px">Ghi ăn uống đủ <b style="color:var(--text)">10 ngày</b> và cân ít nhất <b style="color:var(--text)">4 lần</b> trong 3 tuần, app sẽ tự đo cơ thể bạn đốt bao nhiêu calo thật, chính xác hơn mọi cách tự đoán tạng. Hiện có ${t.real.days}/10 ngày, ${t.real.weighs}/4 lần cân.</div>`}
+        </div>
         <div class="card" style="background:var(--card2);box-shadow:none;margin:0 0 12px">
           <div class="between"><span class="pill acc">${{ bulk: 'Bulk · tăng cân', cut: 'Cut · giảm mỡ', maintain: 'Giữ cân' }[t.goal]}</span>${t.weeks ? `<span class="muted" style="font-size:13px">~${t.weeks} tuần · dự kiến ${dm(addDays(today(), t.weeks * 7))}</span>` : ''}</div>
           <div style="margin-top:8px"><span class="big" style="font-size:30px">${nf(t.kcal, 0)}</span> <span class="muted">kcal/ngày</span></div>
@@ -708,7 +742,10 @@ V.me = () => {
   };
 };
 // seg() gọi fn('giá trị') → bọc setProf cho từng trường
-['sex', 'goal', 'theme', 'unit', 'pace', 'activity'].forEach(k => window['setProf_' + k] = v => { setProf(k, v); draw(); });
+['sex', 'goal', 'theme', 'unit', 'pace', 'activity', 'body', 'metab'].forEach(k => window['setProf_' + k] = v => { setProf(k, v); draw(); });
+window.setProf_body = v => { const p = prof(); if (!p.metabManual) setProf('metab', ''); setProf('body', v); draw(); }; // đổi tạng → trao đổi chất theo tạng, trừ khi đã tự chọn
+window.setProf_metab = v => { setProf('metabManual', true); setProf('metab', v); draw(); };
+window.setProf_theme = v => themeReveal(() => { setProf('theme', v); draw(); });
 function customList() {
   const list = rows('ExerciseLibrary');
   openSheet(`<h2>Bài tập riêng</h2><div class="list">${list.map(r => `<div class="item"><div class="grow"><b>${esc(r.name)}</b><div class="muted" style="font-size:14px">${MUSCLE[r.muscle] || ''} · ${EQUIP[r.equipment] || ''}</div></div><button class="x" onclick="del('ExerciseLibrary','${r.id}');customList()">${IC.x}</button></div>`).join('') || '<div class="empty">Chưa có bài tự tạo</div>'}</div>
@@ -739,6 +776,34 @@ async function login(f) {
   $('#tabs').style.display = ''; applyTheme(); draw();
 }
 
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
+let lastTap = { x: innerWidth / 2, y: innerHeight / 2 };
+document.addEventListener('pointerdown', e => { // gợn sóng từ đúng chỗ ngón tay chạm
+  lastTap = { x: e.clientX, y: e.clientY };
+  const el = e.target.closest('.btn, .card.tap, .seg button, .chips button, #tabs button, .list .item[onclick], #fab, .icon-btn');
+  if (!el || REDUCED.matches) return;
+  const r = el.getBoundingClientRect(), s = Math.max(r.width, r.height) * 2.2, dot = document.createElement('span');
+  dot.className = 'ripple';
+  dot.style.cssText = `width:${s}px;height:${s}px;left:${e.clientX - r.left - s / 2}px;top:${e.clientY - r.top - s / 2}px`;
+  el.appendChild(dot); setTimeout(() => dot.remove(), 700);
+}, { passive: true });
+function burst(n = 10, gold) { // hạt bắn ra từ chỗ vừa bấm (lưu set, kỷ lục…)
+  if (REDUCED.matches) return;
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement('i'), a = (i / n) * Math.PI * 2 + Math.random() * 0.4, d = 40 + Math.random() * (gold ? 70 : 34);
+    p.className = 'spark' + (gold ? ' gold' : '');
+    p.style.cssText = `left:${lastTap.x}px;top:${lastTap.y}px;--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d}px;--s:${gold ? 1 + Math.random() : 0.6 + Math.random() * 0.6}`;
+    document.body.appendChild(p); setTimeout(() => p.remove(), 900);
+  }
+}
+function themeReveal(fn) { // đổi sáng/tối: màu mới loang tròn từ chỗ chạm
+  if (!document.startViewTransition || REDUCED.matches) return fn();
+  const { x, y } = lastTap, r = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)), root = document.documentElement;
+  root.classList.add('theme-vt');
+  const t = document.startViewTransition(fn);
+  t.ready.then(() => root.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] }, { duration: 700, easing: 'cubic-bezier(.2,.8,.2,1)', pseudoElement: '::view-transition-new(root)' }));
+  t.finished.finally(() => root.classList.remove('theme-vt'));
+}
 function applyTheme() {
   const t = prof().theme, root = document.documentElement;
   if (t === 'light' || t === 'dark') root.dataset.theme = t; else delete root.dataset.theme;
