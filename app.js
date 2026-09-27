@@ -233,7 +233,7 @@ const R = { tab: 'home', stacks: Object.fromEntries(TABS.map(t => [t, []])), roo
 const cur = () => R.stacks[R.tab].at(-1) || { v: R.tab, p: R.root[R.tab] };
 function nav(kind, fn, scroll = 0) {
   closeSheet();
-  const run = () => { fn(); draw(); window.scrollTo(0, scroll); };
+  const run = () => { fn(); draw(true); window.scrollTo(0, scroll); };
   if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) return run();
   document.documentElement.classList.add(kind);
   document.startViewTransition(run).finished.finally(() => document.documentElement.classList.remove(kind));
@@ -254,11 +254,12 @@ addEventListener('popstate', () => {
 const setRoot = p => { Object.assign(R.root[R.tab], p); draw(); };
 
 let tick;
-function draw() {
+function draw(anim) { // anim=true khi chuyển màn; false khi cập nhật tại chỗ (bấm nút, lưu…)
   if (!AUTH) return drawLogin();
   const { v, p } = cur(), out = V[v](p);
   if ($('#title').getAttribute('aria-label') !== out.title) blurIn($('#title'), out.title); // chỉ chạy khi đổi tiêu đề
   document.body.classList.toggle('deep', R.stacks[R.tab].length > 0);
+  $('#screen').classList.toggle('still', !anim);
   $('#screen').innerHTML = out.html;
   const fab = $('#fab');
   fab.classList.toggle('hide', !out.fab);
@@ -266,7 +267,8 @@ function draw() {
   document.querySelectorAll('#tabs button').forEach((b, i) => { b.classList.toggle('on', b.dataset.tab === R.tab); if (b.dataset.tab === R.tab) $('#tab-ind').style.transform = `translateX(${i * 100}%)`; });
   clearInterval(tick);
   if (out.tick) tick = setInterval(out.tick, 1000);
-  requestAnimationFrame(() => requestAnimationFrame(animateIn));
+  if (anim) requestAnimationFrame(() => requestAnimationFrame(() => animateIn(true)));
+  else animateIn(false); // đặt ngay giá trị cuối, không nhảy từ 0
 }
 function blurIn(el, text) {
   let i = 0;
@@ -274,11 +276,12 @@ function blurIn(el, text) {
   el.innerHTML = text.normalize('NFC').split(' ').map(w => `<span class="w" aria-hidden="true">${Array.from(w).map(c => `<span class="c" style="--i:${i++}">${esc(c)}</span>`).join('')}</span>`).join(' ');
   clearTimeout(el._bt); el._bt = setTimeout(() => { el.textContent = text; el.classList.remove('bi'); }, 800 + i * 28); // xong hiệu ứng → chữ thường để xuống dòng/cắt đúng
 }
-function animateIn() { // thanh/vòng tiến độ chạy từ 0, số đếm lên
-  document.querySelectorAll('[data-w]').forEach(el => el.style.width = el.dataset.w);
-  document.querySelectorAll('[data-off]').forEach(el => el.style.strokeDashoffset = el.dataset.off);
+function animateIn(anim) { // thanh/vòng tiến độ chạy từ 0, số đếm lên (chỉ khi chuyển màn)
+  document.querySelectorAll('[data-w]').forEach(el => { if (!anim) el.style.transition = 'none'; el.style.width = el.dataset.w; });
+  document.querySelectorAll('[data-off]').forEach(el => { if (!anim) el.style.transition = 'none'; el.style.strokeDashoffset = el.dataset.off; });
   document.querySelectorAll('[data-count]').forEach(el => {
     const to = +el.dataset.count, d = +el.dataset.dec || 0, t0 = performance.now();
+    if (!anim) return el.textContent = nf(to, d);
     const step = t => { const k = Math.min(1, (t - t0) / 800), e = 1 - Math.pow(1 - k, 3); el.textContent = nf(to * e, d); if (k < 1) requestAnimationFrame(step); };
     requestAnimationFrame(step);
   });
@@ -343,6 +346,7 @@ V.home = () => {
           <div class="macro"><span>Fat</span>${bar(e.fat, t.fat)}<span>${nf(e.fat, 0)}/${t.fat}g</span></div>
         </div></div>
         <div class="muted" style="font-size:13px;margin-top:8px">Còn lại ${nf(Math.max(0, t.kcal - e.kcal), 0)} kcal${burned(td) ? ` · đốt ~${burned(td)} kcal khi tập` : ''}</div>
+        <div class="macro" style="margin-top:10px"><span>Nước</span>${bar(drank(td), waterGoal(td))}<span>${nf(drank(td) / 1000, 1)}/${nf(waterGoal(td) / 1000, 1)} L</span></div>
       </div>
       <div class="card tap" onclick="openToday()">
         <div class="between"><div class="label">Buổi tập hôm nay</div>${status}</div>
@@ -533,7 +537,7 @@ V.food = ({ seg: sg = 'log', date = today() }) => {
     html: seg([['log', 'Nhật ký'], ['lib', 'Thư viện món']], 'lib', 'foodSeg') + `<input class="in" placeholder="Tìm món…" oninput="foodLib(this.value)" style="margin-bottom:10px"><div id="flib" class="card list">${foodRows('')}</div>`,
     fab: ['Món mới', () => foodSheet()],
   };
-  const t = targets(), e = eaten(date), logs = rows('NutritionLog').filter(r => r.date === date);
+  const t = targets(), e = eaten(date), logs = rows('NutritionLog').filter(r => r.date === date && !isExtra(r));
   return {
     title: 'Dinh dưỡng',
     html: seg([['log', 'Nhật ký'], ['lib', 'Thư viện món']], 'log', 'foodSeg') + `
@@ -544,6 +548,7 @@ V.food = ({ seg: sg = 'log', date = today() }) => {
         <div class="grow"><div class="macro"><span>Protein</span>${bar(e.protein, t.protein)}<span>${nf(e.protein, 0)}/${t.protein}g</span></div>
         <div class="macro"><span>Carb</span>${bar(e.carb, t.carb)}<span>${nf(e.carb, 0)}/${t.carb}g</span></div>
         <div class="macro"><span>Fat</span>${bar(e.fat, t.fat)}<span>${nf(e.fat, 0)}/${t.fat}g</span></div></div></div></div>
+      ${waterCard(date)}${suppCard(date)}
       ${date === today() ? suggestCard(date) : ''}
       <div class="sec">Đã ăn (${logs.length})</div>
       ${logs.length ? `<div class="card list stagger">${logs.map(r => `<div class="item"><div class="grow"><b>${esc(r.food)}</b><div class="muted" style="font-size:14px">${nf(r.grams, 0)}g · P ${nf(r.protein, 0)} · C ${nf(r.carb, 0)} · F ${nf(r.fat, 0)}</div></div><b>${nf(r.kcal, 0)}</b><span class="muted" style="font-size:13px">kcal</span><button class="x" onclick="del('NutritionLog','${r.id}');draw()">${IC.x}</button></div>`).join('')}</div>` : empty('Chưa ghi món nào. Bấm “Thêm món”.')}`,
@@ -556,6 +561,66 @@ function suggestCard(date) {
   return `<div class="card coach"><div class="between"><div class="label">Gợi ý bữa tiếp theo</div><span class="muted" style="font-size:13px">còn ${nf(rem.k, 0)} kcal · ${nf(Math.max(0, rem.p), 0)}g đạm</span></div>
     ${needP ? '<div class="muted" style="font-size:14px;margin-top:4px">Đạm còn thiếu nhiều so với calo còn lại, nên ưu tiên món giàu đạm.</div>' : ''}
     <div class="list" style="margin-top:4px">${list.map(x => `<div class="item" style="cursor:pointer" onclick="gramSheet('${x.f.id}',${x.g})"><div class="grow"><b>${esc(x.f.name)}</b> <span class="pill">${x.why}</span><div class="muted" style="font-size:14px">${nf(x.g, 0)}g · ${nf(x.K, 0)} kcal · P ${nf(x.P, 0)}g</div></div><span class="pill acc">+</span></div>`).join('')}</div></div>`;
+}
+// ----- Nước & thực phẩm bổ sung -----
+const isExtra = r => /^(wa|sp)_/.test(r.id);
+const waterGoal = date => Math.round((35 * (lastWeight() || 65) + (session(date) ? 500 : 0)) / 50) * 50; // 35 ml/kg, +500 ml ngày tập
+const drank = date => rows('NutritionLog').filter(r => r.date === date && r.id.startsWith('wa_')).reduce((a, r) => a + r.grams, 0);
+function waterCard(date) {
+  const ml = drank(date), goal = waterGoal(date), k = Math.min(1, ml / goal);
+  return `<div class="card water"><div class="between"><div><div class="label">Nước</div>
+      <div style="font:400 28px/1.3 var(--display)">${nf(ml / 1000, 2)}<span class="muted" style="font:500 15px 'Be Vietnam Pro'"> / ${nf(goal / 1000, 1)} lít</span></div></div>
+      <div class="glass" style="--k:${k}"><i></i></div></div>
+    <div class="muted" style="font-size:13px;margin:2px 0 12px">${ml >= goal ? 'Đủ nước rồi, tốt lắm.' : `Còn ${nf((goal - ml) / 1000, 2)} lít${session(date) ? ' (đã cộng 500 ml cho buổi tập)' : ''}`}</div>
+    <div class="row" style="gap:8px">${[[150, 'Ngụm'], [250, 'Cốc'], [500, 'Chai']].map(([v, l]) => `<button class="btn sm soft" style="flex:1;padding:8px 4px;white-space:nowrap;line-height:1.25" onclick="addWater('${date}',${v})">+${v} ml<br><span style="font-size:12px;font-weight:500;opacity:.8">${l}</span></button>`).join('')}
+      <button class="btn sm ghost" aria-label="Bỏ lần vừa thêm" onclick="undoWater('${date}')">↶</button></div></div>`;
+}
+function addWater(date, ml) { put('NutritionLog', { id: 'wa_' + uid(), date, food: 'Nước', grams: ml, kcal: 0, protein: 0, carb: 0, fat: 0 }); draw(); burst(8); }
+function undoWater(date) { const last = rows('NutritionLog').filter(r => r.date === date && r.id.startsWith('wa_')).at(-1); if (last) { del('NutritionLog', last.id); draw(); } }
+const SUPP_PRESETS = [
+  { name: 'Creatine', dose: '5 g', tip: 'Creatine monohydrate 3–5 g mỗi ngày, cả ngày nghỉ; uống lúc nào cũng được.' },
+  { name: 'Whey protein', dose: '1 muỗng (30 g)', kcal: 117, protein: 23, carb: 2.4, fat: 1.8 },
+  { name: 'Vitamin D3', dose: '1 viên' }, { name: 'Omega-3', dose: '2 viên' }, { name: 'Magie', dose: '1 viên' },
+  { name: 'Vitamin tổng hợp', dose: '1 viên' }, { name: 'Caffeine / pre-workout', dose: '1 liều' },
+];
+const supps = () => prof().supps || [];
+const suppId = (date, name) => 'sp_' + date + '_' + name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '');
+function suppCard(date) {
+  const list = supps();
+  const rowsHtml = list.map((s, i) => {
+    const taken = rows('NutritionLog').some(r => r.id === suppId(date, s.name));
+    return `<div class="item" onclick="toggleSupp('${date}',${i})" style="cursor:pointer"><span class="tick ${taken ? 'on' : ''}">${IC.ok}</span>
+      <div class="grow"><b>${esc(s.name)}</b><div class="muted" style="font-size:13px">${esc(s.dose || '')}${s.kcal ? ` · ${s.kcal} kcal · P ${s.protein || 0}g` : ''}</div></div></div>`;
+  }).join('');
+  const done = list.filter(s => rows('NutritionLog').some(r => r.id === suppId(date, s.name))).length;
+  return `<div class="card"><div class="between"><div class="label">Thực phẩm bổ sung</div>${list.length ? `<span class="pill ${done === list.length ? 'good' : 'acc'}">${done}/${list.length} đã uống</span>` : ''}</div>
+    ${list.length ? `<div class="list" style="margin-top:4px">${rowsHtml}</div>` : '<div class="muted" style="font-size:14px;margin:6px 0 4px">Chưa có. Thêm creatine, whey, vitamin… để tick mỗi ngày.</div>'}
+    <button class="btn sm ghost" style="margin-top:10px" onclick="suppSheet()">${list.length ? 'Sửa danh sách' : '+ Thêm thực phẩm bổ sung'}</button></div>`;
+}
+function toggleSupp(date, i) {
+  const s = supps()[i], id = suppId(date, s.name);
+  if (rows('NutritionLog').some(r => r.id === id)) del('NutritionLog', id);
+  else { put('NutritionLog', { id, date, food: 'Bổ sung: ' + s.name, grams: parseFloat(s.dose) || 0, kcal: +s.kcal || 0, protein: +s.protein || 0, carb: +s.carb || 0, fat: +s.fat || 0 }); burst(8); }
+  draw();
+}
+function suppSheet() {
+  const list = supps(), have = new Set(list.map(s => s.name));
+  const tip = list.find(s => s.name === 'Creatine') ? `<div class="card coach" style="background:var(--card2);box-shadow:none">${SUPP_PRESETS[0].tip}</div>` : '';
+  openSheet(`<h2>Thực phẩm bổ sung</h2>${tip}
+    <div class="list">${list.map((s, i) => `<div class="item"><div class="grow"><b>${esc(s.name)}</b><div class="muted" style="font-size:13px">${esc(s.dose || '')}</div></div><button class="x" onclick="removeSupp(${i})">${IC.x}</button></div>`).join('')}</div>
+    <div class="label" style="margin:14px 0 8px">Thêm nhanh</div>
+    <div class="chips" style="flex-wrap:wrap;margin:0 0 14px;padding:0">${SUPP_PRESETS.filter(p => !have.has(p.name)).map(p => `<button onclick="addSupp(${SUPP_PRESETS.indexOf(p)})">+ ${esc(p.name)}</button>`).join('') || '<span class="muted">Đã thêm hết gợi ý</span>'}</div>
+    <form onsubmit="return saveSupp(this)"><div class="label" style="margin-bottom:8px">Hoặc tự thêm</div>
+      <div class="grid2" style="margin:0"><label class="field"><span>Tên</span><input class="in" name="name" required placeholder="VD: BCAA"></label><label class="field"><span>Liều</span><input class="in" name="dose" placeholder="VD: 5 g"></label></div>
+      <div class="grid2" style="margin:0"><label class="field"><span>Calo (nếu có)</span><input class="in" name="kcal" type="number" min="0" step="any" placeholder="0"></label><label class="field"><span>Protein g (nếu có)</span><input class="in" name="protein" type="number" min="0" step="any" placeholder="0"></label></div>
+      <button class="btn">Thêm</button></form>`);
+}
+function setSupps(list) { setProf('supps', list); draw(); suppSheet(); }
+const addSupp = i => { const { tip, ...s } = SUPP_PRESETS[i]; setSupps([...supps(), s]); };
+const removeSupp = i => setSupps(supps().filter((_, j) => j !== i));
+function saveSupp(f) {
+  const name = f.name.value.trim(); if (!name || supps().some(s => s.name === name)) return false;
+  setSupps([...supps(), { name, dose: f.dose.value.trim(), kcal: +f.kcal.value || 0, protein: +f.protein.value || 0 }]); return false;
 }
 const foodSeg = s => nav('tab', () => Object.assign(R.root.food, { seg: s }));
 function foods() { // món có sẵn + món trong Sheet (trùng id thì Sheet ghi đè)
@@ -773,7 +838,7 @@ async function login(f) {
   try { DATA = norm((await api({ ops: [] })).data); }
   catch (e) { AUTH = null; b.disabled = false; b.textContent = 'Vào app'; toast(/Sai mã/.test(e.message) ? 'Sai mật khẩu' : 'Không kết nối được, thử lại'); return; }
   store.set('auth', a); store.set('last', Date.now()); save();
-  $('#tabs').style.display = ''; applyTheme(); draw();
+  $('#tabs').style.display = ''; applyTheme(); draw(true);
 }
 
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
@@ -814,6 +879,6 @@ function applyTheme() {
 document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => go(b.dataset.tab));
 addEventListener('online', queueSync);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) queueSync(); });
-applyTheme(); draw(); loadEx();
+applyTheme(); draw(true); loadEx();
 if (AUTH) sync();
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' });
