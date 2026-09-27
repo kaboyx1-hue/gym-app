@@ -3,6 +3,7 @@
   --bg: #f8f3ea; --card: #fffcf6; --card2: #f1e9dc; --text: #2b2118; --muted: #8a7b68; --line: #e8dccb;
   --acc: #f26a1b; --acc-ink: #fff; --acc-soft: #fde3cf; --good: #2f9e55; --warn: #d9480f; --bad: #d64545;
   --shadow: 0 1px 2px rgba(92,60,20,.06), 0 8px 24px rgba(92,60,20,.07);
+  --display: 'Cal Sans', 'Be Vietnam Pro', system-ui, sans-serif;
   --ease: cubic-bezier(.2,.8,.2,1); --spring: cubic-bezier(.34,1.56,.64,1);
   color-scheme: light;
 }
@@ -32,10 +33,10 @@ img { display: block; }
   padding: calc(env(safe-area-inset-top) + 10px) 16px 10px; background: color-mix(in srgb, var(--bg) 82%, transparent);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
 }
-#top h1 { font-size: 24px; font-weight: 800; margin: 0; flex: 1; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#top h1 { font: 400 26px/1.15 var(--display); letter-spacing: -.01em; margin: 0; flex: 1; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #back { display: none; margin-left: -8px; }
 body.deep #back { display: grid; }
-body.deep #top h1 { font-size: 18px; }
+body.deep #top h1 { font-size: 20px; }
 #sync { width: 8px; height: 8px; border-radius: 50%; background: var(--good); transition: background .3s; }
 #sync.pending { background: var(--warn); animation: pulse 1s infinite; }
 #sync.off { background: var(--muted); }
@@ -86,6 +87,11 @@ body.deep #top h1 { font-size: 18px; }
 @keyframes pulse { 50% { opacity: .35; } }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
+/* Chữ hiện dần từng ký tự: mờ nhòe + trượt lên (kiểu kites.design) */
+.bi .w { white-space: nowrap; }
+.bi .c { display: inline-block; animation: blurin .75s var(--ease) both; animation-delay: calc(var(--i) * 28ms); }
+@keyframes blurin { from { opacity: 0; filter: blur(10px); transform: translateY(35%); } }
+
 /* Danh sách xuất hiện so le */
 .stagger > * { animation: rise .45s var(--ease) both; }
 .stagger > *:nth-child(2) { animation-delay: .04s; } .stagger > *:nth-child(3) { animation-delay: .08s; }
@@ -99,7 +105,7 @@ body.deep #top h1 { font-size: 18px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .grid2 > .card { margin: 0; }
 .label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.big { font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.big { font-family: var(--display); font-size: 36px; font-weight: 400; letter-spacing: -.01em; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .big small { font-size: 15px; font-weight: 600; color: var(--muted); margin-left: 2px; }
 .muted { color: var(--muted); }
 .row { display: flex; align-items: center; gap: 12px; }
@@ -182,6 +188,7 @@ input.in[type=number] { font-variant-numeric: tabular-nums; }
 .chips button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
 .list > .item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
 .list > .item:first-child { border-top: 0; }
+.item > .grow { flex: 1; min-width: 0; }
 .x { border: 0; background: none; color: var(--muted); padding: 6px; cursor: pointer; border-radius: 10px; }
 .x svg { width: 18px; height: 18px; }
 
@@ -195,7 +202,7 @@ input.in[type=number] { font-variant-numeric: tabular-nums; }
 }
 #sheet-wrap.open #sheet { transform: translate(-50%, 0); }
 #sheet::before { content: ''; display: block; width: 40px; height: 5px; border-radius: 9px; background: var(--line); margin: 0 auto 12px; }
-#sheet h2 { margin: 0 0 14px; font-size: 20px; }
+#sheet h2 { margin: 0 0 14px; font: 400 24px/1.2 var(--display); }
 #sheet.tall { height: 92vh; }
 
 #toast {
@@ -221,7 +228,7 @@ input.in[type=number] { font-variant-numeric: tabular-nums; }
 .login { min-height: 80vh; display: flex; flex-direction: column; justify-content: center; }
 .logo { width: 72px; height: 72px; border-radius: 22px; background: var(--acc); color: var(--acc-ink); display: grid; place-items: center; margin-bottom: 18px; animation: pop .6s var(--spring); }
 .logo svg { width: 40px; height: 40px; stroke-width: 2.5; }
-.timer { font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.timer { font-family: var(--display); font-size: 42px; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

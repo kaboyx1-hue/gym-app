@@ -111,15 +111,46 @@ const prof = () => { try { return JSON.parse(rows('Settings').find(r => r.id ===
 function setProf(k, v) { const p = { ...prof(), [k]: v }; put('Settings', { id: 'profile', json: JSON.stringify(p) }); applyTheme(); return p; }
 const weights = () => rows('WeightLog').slice().sort((a, b) => a.date < b.date ? -1 : 1);
 const lastWeight = () => weights().at(-1)?.kg || 0;
+const ACT = { low: 1.375, mid: 1.55, high: 1.725 }; // hệ số vận động
 function targets() {
-  const p = prof(), w = lastWeight() || 65;
+  const p = prof(), w = lastWeight() || 65, tk = +p.targetKg || 0;
   const bmr = 10 * w + 6.25 * (+p.height || 170) - 5 * (+p.age || 25) + (p.sex === 'f' ? -161 : 5); // Mifflin-St Jeor
-  const tdee = bmr * 1.55; // mức vận động vừa (tập 3-5 buổi/tuần)
-  const goal = p.goal || 'maintain';
-  const kcal = +p.kcal || Math.round((tdee + { bulk: 300, cut: -500, maintain: 0 }[goal]) / 10) * 10;
+  const tdee = bmr * (ACT[p.activity] || ACT.mid);
+  const diff = tk ? tk - w : 0;
+  const goal = tk ? (diff > 0.5 ? 'bulk' : diff < -0.5 ? 'cut' : 'maintain') : (p.goal || 'maintain');
+  const pace = +p.pace || (goal === 'bulk' ? 0.25 : 0.5); // kg/tuần
+  const adj = goal === 'maintain' ? 0 : (goal === 'bulk' ? 1 : -1) * pace * 7700 / 7; // ~7700 kcal ≈ 1 kg mỡ
+  const floor = Math.max(p.sex === 'f' ? 1200 : 1500, bmr); // không cắt xuống dưới mức an toàn
+  const auto = Math.round(Math.max(tdee + adj, goal === 'cut' ? floor : 0) / 10) * 10;
+  const kcal = +p.kcal || auto;
   const protein = Math.round(w * { bulk: 1.8, cut: 2.2, maintain: 1.6 }[goal]);
   const fat = Math.round(kcal * 0.25 / 9);
-  return { kcal, protein, fat, carb: Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)), tdee: Math.round(tdee) };
+  const weeks = goal === 'maintain' || !tk ? 0 : Math.ceil(Math.abs(diff) / pace);
+  return { kcal, auto, protein, fat, carb: Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)), tdee: Math.round(tdee), goal, pace, diff, weeks, floored: goal === 'cut' && tdee + adj < floor };
+}
+// Gợi ý món Việt bù phần dinh dưỡng còn thiếu trong ngày
+const NOT_SUGGEST = /Bia|Trà sữa|Nước mía|Cà phê|Mì gói|Chả giò/;
+function suggest(date) {
+  const t = targets(), e = eaten(date), rem = { k: t.kcal - e.kcal, p: t.protein - e.protein, c: t.carb - e.carb, f: t.fat - e.fat };
+  if (rem.k < 120) return { rem, list: [] };
+  const needP = rem.p > 0 && rem.p * 4 / rem.k > 0.3; // protein còn thiếu nhiều so với calo còn lại
+  const ate = new Set(rows('NutritionLog').filter(r => r.date === date).map(r => r.food));
+  // Phân vai theo tỷ lệ năng lượng: đạm / tinh bột / rau-canh-trái cây
+  const list = foods().filter(f => !NOT_SUGGEST.test(f.name) && !ate.has(f.name) && f.kcal > 0).map(f => {
+    const ps = f.protein * 4 / f.kcal, cs = f.carb * 4 / f.kcal;
+    const why = ps > 0.45 ? 'giàu đạm' : f.kcal <= 70 ? 'rau, canh, trái cây' : cs >= 0.55 ? 'tinh bột' : '';
+    let g = f.portion || 100;
+    if (f.kcal * g / 100 > rem.k) g = Math.floor(rem.k / f.kcal * 100 / 10) * 10; // thu nhỏ cho vừa calo còn lại
+    const k = g / 100;
+    return why && g >= 30 ? { f, g, K: f.kcal * k, P: f.protein * k, why, ps, cs } : null;
+  }).filter(Boolean);
+  const top = (why, n, by) => list.filter(x => x.why === why).sort(by).slice(0, n);
+  const picked = [
+    ...top('giàu đạm', needP ? 2 : 1, (a, b) => b.ps - a.ps || b.P - a.P), // đạm nạc trước
+    ...(rem.c > 30 ? top('tinh bột', 1, (a, b) => (a.f.fat - b.f.fat) || b.cs - a.cs) : []), // tinh bột ít béo
+    ...top('rau, canh, trái cây', 1, (a, b) => b.P - a.P),
+  ];
+  return { rem, list: picked, needP };
 }
 function eaten(date) {
   return rows('NutritionLog').filter(r => r.date === date).reduce((a, r) => ({ kcal: a.kcal + r.kcal, protein: a.protein + r.protein, carb: a.carb + r.carb, fat: a.fat + r.fat }), { kcal: 0, protein: 0, carb: 0, fat: 0 });
@@ -204,7 +235,7 @@ let tick;
 function draw() {
   if (!AUTH) return drawLogin();
   const { v, p } = cur(), out = V[v](p);
-  $('#title').textContent = out.title;
+  if ($('#title').getAttribute('aria-label') !== out.title) blurIn($('#title'), out.title); // chỉ chạy khi đổi tiêu đề
   document.body.classList.toggle('deep', R.stacks[R.tab].length > 0);
   $('#screen').innerHTML = out.html;
   const fab = $('#fab');
@@ -214,6 +245,11 @@ function draw() {
   clearInterval(tick);
   if (out.tick) tick = setInterval(out.tick, 1000);
   requestAnimationFrame(() => requestAnimationFrame(animateIn));
+}
+function blurIn(el, text) {
+  let i = 0;
+  el.setAttribute('aria-label', text); el.classList.add('bi');
+  el.innerHTML = text.normalize('NFC').split(' ').map(w => `<span class="w" aria-hidden="true">${Array.from(w).map(c => `<span class="c" style="--i:${i++}">${esc(c)}</span>`).join('')}</span>`).join(' ');
 }
 function animateIn() { // thanh/vòng tiến độ chạy từ 0, số đếm lên
   document.querySelectorAll('[data-w]').forEach(el => el.style.width = el.dataset.w);
@@ -480,11 +516,19 @@ V.food = ({ seg: sg = 'log', date = today() }) => {
         <div class="grow"><div class="macro"><span>Protein</span>${bar(e.protein, t.protein)}<span>${nf(e.protein, 0)}/${t.protein}g</span></div>
         <div class="macro"><span>Carb</span>${bar(e.carb, t.carb)}<span>${nf(e.carb, 0)}/${t.carb}g</span></div>
         <div class="macro"><span>Fat</span>${bar(e.fat, t.fat)}<span>${nf(e.fat, 0)}/${t.fat}g</span></div></div></div></div>
+      ${date === today() ? suggestCard(date) : ''}
       <div class="sec">Đã ăn (${logs.length})</div>
       ${logs.length ? `<div class="card list stagger">${logs.map(r => `<div class="item"><div class="grow"><b>${esc(r.food)}</b><div class="muted" style="font-size:13px">${nf(r.grams, 0)}g · P ${nf(r.protein, 0)} · C ${nf(r.carb, 0)} · F ${nf(r.fat, 0)}</div></div><b>${nf(r.kcal, 0)}</b><span class="muted" style="font-size:12px">kcal</span><button class="x" onclick="del('NutritionLog','${r.id}');draw()">${IC.x}</button></div>`).join('')}</div>` : empty('Chưa ghi món nào. Bấm “Thêm món”.')}`,
     fab: ['Thêm món', () => push('addFood', { date })],
   };
 };
+function suggestCard(date) {
+  const { rem, list, needP } = suggest(date);
+  if (!list.length) return rem.k < 120 ? `<div class="card coach"><b>Đã đủ calo hôm nay.</b> <span class="muted">${rem.p > 10 ? `Còn thiếu ${nf(rem.p, 0)}g protein, ưu tiên lòng trắng trứng, ức gà, whey.` : 'Giữ nhịp này nhé.'}</span></div>` : '';
+  return `<div class="card coach"><div class="between"><div class="label">Gợi ý bữa tiếp theo</div><span class="muted" style="font-size:12px">còn ${nf(rem.k, 0)} kcal · ${nf(Math.max(0, rem.p), 0)}g đạm</span></div>
+    ${needP ? '<div class="muted" style="font-size:13px;margin-top:4px">Đạm còn thiếu nhiều so với calo còn lại, nên ưu tiên món giàu đạm.</div>' : ''}
+    <div class="list" style="margin-top:4px">${list.map(x => `<div class="item" style="cursor:pointer" onclick="gramSheet('${x.f.id}',${x.g})"><div class="grow"><b>${esc(x.f.name)}</b> <span class="pill">${x.why}</span><div class="muted" style="font-size:13px">${nf(x.g, 0)}g · ${nf(x.K, 0)} kcal · P ${nf(x.P, 0)}g</div></div><span class="pill acc">+</span></div>`).join('')}</div></div>`;
+}
 const foodSeg = s => nav('tab', () => Object.assign(R.root.food, { seg: s }));
 function foods() { // món có sẵn + món trong Sheet (trùng id thì Sheet ghi đè)
   const custom = rows('FoodLibrary'), ids = new Set(custom.map(f => f.id));
@@ -521,10 +565,10 @@ V.addFood = ({ date }) => ({
     <div id="fpick" class="card list">${foodRows('', 1)}</div>`,
   fab: ['Món mới', () => foodSheet()],
 });
-function gramSheet(id) {
+function gramSheet(id, preset) {
   const f = foods().find(x => x.id === id), p = f.portion || 100;
   openSheet(`<h2>${esc(f.name)}</h2><form onsubmit="return saveEat(this,'${id}')">
-    <label class="field"><span>Khối lượng (g)</span><input class="in" name="g" id="gg" type="number" inputmode="decimal" min="1" step="any" value="${p}" oninput="gramPrev('${id}')" required style="font-size:22px;font-weight:700"></label>
+    <label class="field"><span>Khối lượng (g)</span><input class="in" name="g" id="gg" type="number" inputmode="decimal" min="1" step="any" value="${preset || p}" oninput="gramPrev('${id}')" required style="font-size:22px;font-weight:700"></label>
     <div class="chips" style="margin:0 0 12px">${[[p, '1 phần'], [p / 2, '½ phần'], [p * 1.5, '1,5 phần'], [100, '100g'], [200, '200g']].map(([g, l]) => `<button type="button" onclick="$('#gg').value=${g};gramPrev('${id}')">${l} · ${nf(g, 0)}g</button>`).join('')}</div>
     <div class="card" style="background:var(--card2);box-shadow:none" id="gprev"></div>
     <button class="btn">Thêm vào nhật ký</button></form>`);
@@ -538,7 +582,7 @@ function saveEat(form, id) {
   const f = foods().find(x => x.id === id), g = +form.g.value, k = g / 100, date = cur().p.date || today();
   const r1 = n => Math.round(n * 10) / 10;
   put('NutritionLog', { id: uid(), date, food: f.name, grams: g, kcal: Math.round(f.kcal * k), protein: r1(f.protein * k), carb: r1(f.carb * k), fat: r1(f.fat * k) });
-  toast(`Đã thêm ${f.name}`); history.back();
+  toast(`Đã thêm ${f.name}`); if (R.stacks[R.tab].length) history.back(); else { closeSheet(); draw(); }
   return false;
 }
 
@@ -631,9 +675,21 @@ V.me = () => {
       <div class="card">${inp('name', 'Tên hiển thị', 'text', OWNER)}
         <div class="field"><span class="label" style="display:block;margin-bottom:4px">Giới tính</span>${seg([['m', 'Nam'], ['f', 'Nữ']], p.sex || 'm', 'setProf_sex')}</div>
         <div class="grid2" style="margin:0">${inp('age', 'Tuổi', 'number', '25')}${inp('height', 'Chiều cao (cm)', 'number', '170')}</div></div>
-      <div class="card"><div class="label" style="margin-bottom:8px">Giai đoạn</div>${seg([['bulk', 'Bulk (tăng)'], ['maintain', 'Giữ'], ['cut', 'Cut (giảm)']], p.goal || 'maintain', 'setProf_goal')}
-        <div class="muted" style="font-size:13px;margin-bottom:10px">Gợi ý từ cân nặng ${nf(lastWeight() || 65)} kg · TDEE ~${t.tdee} kcal → <b style="color:var(--text)">${t.kcal} kcal</b>, protein ${t.protein}g, carb ${t.carb}g, fat ${t.fat}g</div>
-        ${inp('kcal', 'Tự đặt mục tiêu calo (để trống = dùng gợi ý)', 'number', String(t.kcal))}</div>
+      <div class="card"><div class="label" style="margin-bottom:10px">Cân nặng & mục tiêu</div>
+        <div class="grid2" style="margin:0">
+          <label class="field"><span>Cân nặng hôm nay (${unit()})</span><input class="in" type="number" inputmode="decimal" step="0.1" value="${lastWeight() ? +toU(lastWeight()).toFixed(1) : ''}" placeholder="VD: 70" onchange="saveTodayWeight(this.value)"></label>
+          <label class="field"><span>Cân nặng mục tiêu (${unit()})</span><input class="in" type="number" inputmode="decimal" step="0.5" value="${p.targetKg ? +toU(p.targetKg).toFixed(1) : ''}" placeholder="VD: 75" onchange="setProf('targetKg',this.value?Math.round(fromU(+this.value)*10)/10:'');draw()"></label>
+        </div>
+        ${t.goal !== 'maintain' && p.targetKg ? `<div class="field"><span class="label" style="display:block;margin-bottom:4px">Tốc độ ${t.goal === 'bulk' ? 'tăng' : 'giảm'} mỗi tuần</span>${seg(t.goal === 'bulk' ? [['0.25', 'Chậm 0,25kg'], ['0.5', 'Nhanh 0,5kg']] : [['0.25', 'Nhẹ 0,25kg'], ['0.5', 'Vừa 0,5kg'], ['0.75', 'Nhanh 0,75kg']], String(t.pace), 'setProf_pace')}</div>` : ''}
+        <div class="field"><span class="label" style="display:block;margin-bottom:4px">Mức vận động ngoài giờ tập</span>${seg([['low', 'Ít (văn phòng)'], ['mid', 'Vừa'], ['high', 'Nhiều']], p.activity || 'mid', 'setProf_activity')}</div>
+        <div class="card" style="background:var(--card2);box-shadow:none;margin:0 0 12px">
+          <div class="between"><span class="pill acc">${{ bulk: 'Bulk · tăng cân', cut: 'Cut · giảm mỡ', maintain: 'Giữ cân' }[t.goal]}</span>${t.weeks ? `<span class="muted" style="font-size:12px">~${t.weeks} tuần · dự kiến ${dm(addDays(today(), t.weeks * 7))}</span>` : ''}</div>
+          <div style="margin-top:8px"><span class="big" style="font-size:30px">${nf(t.kcal, 0)}</span> <span class="muted">kcal/ngày</span></div>
+          <div class="muted" style="font-size:13px">Protein ${t.protein}g · Carb ${t.carb}g · Fat ${t.fat}g · tiêu hao ước tính ~${nf(t.tdee, 0)} kcal</div>
+          ${p.targetKg ? `<div class="muted" style="font-size:12px;margin-top:4px">${t.goal === 'maintain' ? 'Đã sát cân nặng mục tiêu.' : `Còn ${t.diff > 0 ? 'tăng' : 'giảm'} ${nf(Math.abs(toU(t.diff)))} ${unit()}.`}</div>` : '<div class="muted" style="font-size:12px;margin-top:4px">Nhập cân nặng mục tiêu để app tự tính calo.</div>'}
+          ${t.floored ? '<div style="font-size:12px;margin-top:4px;color:var(--warn)">Đã giữ calo ở mức tối thiểu an toàn, nên chọn tốc độ giảm chậm hơn.</div>' : ''}
+        </div>
+        ${inp('kcal', 'Tự đặt calo (để trống = app tự tính)', 'number', String(t.auto))}</div>
       <div class="card"><div class="label" style="margin-bottom:8px">Giao diện</div>${seg([['light', 'Sáng'], ['dark', 'Tối'], ['system', 'Theo hệ thống']], p.theme || 'system', 'setProf_theme')}
         <div class="label" style="margin-bottom:8px">Đơn vị</div>${seg([['kg', 'kg'], ['lbs', 'lbs']], unit(), 'setProf_unit')}</div>
       <div class="card tap" onclick="customList()"><div class="between"><div><b>Thư viện bài tập riêng</b><div class="muted" style="font-size:13px">${rows('ExerciseLibrary').length} bài tự tạo · ${EX ? EX.size : '…'} bài có sẵn kèm hình</div></div>${IC.chev}</div></div>
@@ -644,7 +700,11 @@ V.me = () => {
   };
 };
 // seg() gọi fn('giá trị') → bọc setProf cho từng trường
-['sex', 'goal', 'theme', 'unit'].forEach(k => window['setProf_' + k] = v => { setProf(k, v); draw(); });
+['sex', 'goal', 'theme', 'unit', 'pace', 'activity'].forEach(k => window['setProf_' + k] = v => { setProf(k, v); draw(); });
+function saveTodayWeight(v) {
+  if (!+v) return;
+  put('WeightLog', { id: 'w' + today(), date: today(), kg: Math.round(fromU(+v) * 100) / 100 }); draw(); toast('Đã cập nhật cân nặng');
+}
 function customList() {
   const list = rows('ExerciseLibrary');
   openSheet(`<h2>Bài tập riêng</h2><div class="list">${list.map(r => `<div class="item"><div class="grow"><b>${esc(r.name)}</b><div class="muted" style="font-size:13px">${MUSCLE[r.muscle] || ''} · ${EQUIP[r.equipment] || ''}</div></div><button class="x" onclick="del('ExerciseLibrary','${r.id}');customList()">${IC.x}</button></div>`).join('') || '<div class="empty">Chưa có bài tự tạo</div>'}</div>
@@ -657,12 +717,13 @@ function logout() {
 
 // ===== Đăng nhập =====
 function drawLogin() {
-  $('#title').textContent = ''; $('#fab').classList.add('hide'); setSync('off'); $('#tabs').style.display = 'none';
+  $('#title').textContent = ''; $('#title').removeAttribute('aria-label'); $('#fab').classList.add('hide'); setSync('off'); $('#tabs').style.display = 'none';
   $('#screen').innerHTML = `<form class="login" onsubmit="login(this);return false">
     <div class="logo">${IC.dumb}</div>
-    <h1 style="font-size:30px;margin:0 0 24px;letter-spacing:-.02em">Xin chào ${OWNER}</h1>
+    <h1 id="hello" style="font:400 34px/1.15 var(--display);margin:0 0 24px"></h1>
     <label class="field"><span>Mật khẩu</span><input class="in" name="key" type="password" autocomplete="current-password" required autofocus></label>
     <button class="btn" id="lbtn">Vào app</button></form>`;
+  blurIn($('#hello'), 'Xin chào ' + OWNER);
 }
 async function login(f) {
   const a = { name: OWNER, api: API, key: f.key.value }, b = $('#lbtn');
