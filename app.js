@@ -190,8 +190,11 @@ function bestOf(list) {
 let EX = null; // Map id -> bài tập
 async function loadEx() {
   try {
-    const list = await (await fetch(EXDB + 'dist/exercises.json')).json();
-    EX = new Map(list.map(e => [e.id, { id: e.id, name: e.name, muscles: e.primaryMuscles, second: e.secondaryMuscles, equipment: e.equipment, level: e.level, category: e.category, steps: e.instructions, imgs: e.images.map(p => EXDB + 'exercises/' + p) }]));
+    const [list, vi] = await Promise.all([
+      fetch(EXDB + 'dist/exercises.json').then(r => r.json()),
+      fetch('exercises-vi.json').then(r => r.ok ? r.json() : {}).catch(() => ({})), // tên + hướng dẫn tiếng Việt
+    ]);
+    EX = new Map(list.map(e => [e.id, { id: e.id, name: vi[e.id]?.n || e.name, en: e.name, muscles: e.primaryMuscles, second: e.secondaryMuscles, equipment: e.equipment, level: e.level, category: e.category, steps: vi[e.id]?.s || e.instructions, imgs: e.images.map(p => EXDB + 'exercises/' + p) }]));
     if (AUTH && !document.activeElement?.matches('input,select,textarea')) draw();
     if (pickCb) pickList();
   } catch { toast('Không tải được thư viện bài tập — kiểm tra mạng'); }
@@ -427,6 +430,7 @@ V.ex = ({ id }) => {
   return {
     title: e.name,
     html: `${e.imgs.length ? `<div class="anim smooth">${e.imgs.slice(0, 2).map(u => `<img src="${esc(u)}" alt="${esc(e.name)}">`).join('')}</div>` : ''}
+      ${e.en && e.en !== e.name ? `<div class="muted" style="margin:-4px 4px 12px;font-size:14px">${esc(e.en)}</div>` : ''}
       ${e.loading ? '<div class="muted" style="margin-bottom:12px">Đang tải thư viện bài tập…</div>' : ''}
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${e.muscles.map(m => `<span class="pill acc">${MUSCLE[m] || esc(m)}</span>`).join('')}${e.second.map(m => `<span class="pill">${MUSCLE[m] || m}</span>`).join('')}${e.equipment ? `<span class="pill">${EQUIP[e.equipment] || esc(e.equipment)}</span>` : ''}${e.level ? `<span class="pill">${LEVEL[e.level]}</span>` : ''}</div>
       <div class="card coach"><div class="label" style="margin-bottom:4px">Huấn luyện viên</div>${coach}</div>
@@ -443,7 +447,7 @@ V.ex = ({ id }) => {
           <div><div class="big" style="font-size:24px">${W(e1rm(best.e1.kg, best.e1.reps))}</div><div class="muted" style="font-size:13px">1RM ước tính · ${dm(best.e1.date)}</div></div></div>
         ${series.length > 1 ? `<div style="margin-top:12px">${chart(series)}</div>` : ''}</div>` : ''}
       ${hist ? `<div class="card"><div class="label">Lịch sử</div><div class="list">${hist}</div></div>` : ''}
-      ${e.steps.length ? `<div class="card"><details><summary>Hướng dẫn thực hiện (EN)</summary><ol class="steps">${e.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></details></div>` : ''}`,
+      ${e.steps.length ? `<div class="card"><details open><summary>Hướng dẫn thực hiện</summary><ol class="steps">${e.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></details></div>` : ''}`,
   };
 };
 let lastSaved = null;
@@ -477,7 +481,7 @@ function pickList() {
   if (!EX) { el.innerHTML = '<div class="empty">Đang tải thư viện…</div>'; return; }
   const q = pickQ.trim().toLowerCase();
   let list = allEx();
-  if (q) list = list.filter(e => (e.name + ' ' + mus(e) + ' ' + e.muscles.join(' ')).toLowerCase().includes(q));
+  if (q) list = list.filter(e => (e.name + ' ' + (e.en || '') + ' ' + mus(e) + ' ' + e.muscles.join(' ')).toLowerCase().includes(q));
   if (pickM) list = list.filter(e => e.muscles.includes(pickM));
   if (!q && !pickM) list = [...rows('ExerciseLibrary').map(r => ex(r.id)), ...POPULAR.map(id => EX.get(id)).filter(Boolean)];
   else list.sort((a, b) => (POPULAR.includes(b.id) - POPULAR.includes(a.id)) || ((b.category === 'strength') - (a.category === 'strength')));
@@ -598,7 +602,7 @@ V.progress = ({ seg: sg = 'weight', range = 90 }) => {
           ${ch != null ? `<div style="text-align:right"><div class="label">Thay đổi</div><b class="${ch > 0 ? 'up' : 'down'}" style="font-size:18px">${ch > 0 ? '+' : ''}${nf(ch)} ${unit()}</b></div>` : ''}</div>
         <div class="chips" style="margin:10px 0 4px">${[[30, '30 ngày'], [90, '90 ngày'], [365, '1 năm'], [0, 'Tất cả']].map(([k, l]) => `<button class="${k === range ? 'on' : ''}" onclick="setRoot({range:${k}})">${l}</button>`).join('')}</div>
         ${chart(shown.map(w => ({ x: w.date, y: toU(w.kg) })))}</div>
-        <div class="sec">Lịch sử</div>${ws.length ? `<div class="card list">${ws.slice().reverse().slice(0, 60).map((w, i, a) => { const d = a[i + 1] ? Math.round(toU(w.kg - a[i + 1].kg) * 10) / 10 : 0; return `<div class="item"><div class="grow">${new Date(w.date + 'T00:00').toLocaleDateString('vi-VN')}</div><span class="${d > 0 ? 'up' : d < 0 ? 'down' : 'muted'}" style="font-size:13px">${d ? (d > 0 ? '+' : '') + nf(d) : ''}</span><b>${nf(toU(w.kg))} ${unit()}</b><button class="x" onclick="del('WeightLog','${w.id}');draw()">${IC.x}</button></div>`; }).join('')}</div>` : empty('Chưa có số cân nào')}`,
+        <div class="sec">Lịch sử</div>${ws.length ? `<div class="card list">${ws.slice().reverse().slice(0, 60).map((w, i, a) => { const d = a[i + 1] ? Math.round(toU(w.kg - a[i + 1].kg) * 10) / 10 : 0; return `<div class="item"><div class="grow">${new Date(w.date + 'T00:00').toLocaleDateString('vi-VN')}${w.time ? `<div class="muted" style="font-size:13px">lúc ${esc(w.time)}</div>` : ''}</div><span class="${d > 0 ? 'up' : d < 0 ? 'down' : 'muted'}" style="font-size:13px">${d ? (d > 0 ? '+' : '') + nf(d) : ''}</span><b>${nf(toU(w.kg))} ${unit()}</b><button class="x" onclick="del('WeightLog','${w.id}');draw()">${IC.x}</button></div>`; }).join('')}</div>` : empty('Chưa có số cân nào')}`,
       fab: ['Cân nặng', weightSheet],
     };
   }
@@ -625,14 +629,16 @@ V.progress = ({ seg: sg = 'weight', range = 90 }) => {
 };
 const progSeg = s => nav('tab', () => Object.assign(R.root.progress, { seg: s }));
 function weightSheet() {
-  openSheet(`<h2>Cân nặng</h2><form onsubmit="return saveWeight(this)">
-    <label class="field"><span>Ngày</span><input class="in" name="date" type="date" value="${today()}" max="${today()}" required></label>
+  const now = nowTime().slice(0, 5);
+  openSheet(`<h2>Khai báo cân nặng</h2><form onsubmit="return saveWeight(this)">
+    <div class="grid2" style="margin:0"><label class="field"><span>Ngày</span><input class="in" name="date" type="date" value="${today()}" max="${today()}" required></label>
+    <label class="field"><span>Giờ cân</span><input class="in" name="time" type="time" value="${now}" required></label></div>
     <label class="field"><span>Cân nặng (${unit()})</span><input class="in" name="kg" type="number" inputmode="decimal" step="0.1" min="20" max="700" value="${lastWeight() ? +toU(lastWeight()).toFixed(1) : ''}" required style="font-size:22px;font-weight:700"></label>
     <button class="btn">Lưu</button></form>`);
 }
 function saveWeight(f) {
   const date = f.date.value;
-  put('WeightLog', { id: 'w' + date, date, kg: Math.round(fromU(+f.kg.value) * 100) / 100 }); // 1 số/ngày
+  put('WeightLog', { id: 'w' + date, date, time: f.time.value, kg: Math.round(fromU(+f.kg.value) * 100) / 100 }); // 1 số/ngày, khai báo lại trong ngày sẽ ghi đè
   closeSheet(); draw(); toast('Đã lưu cân nặng'); return false;
 }
 function bodySheet() {
@@ -668,7 +674,7 @@ function shrink(file) { // thu ảnh về cạnh dài 1200px JPEG → base64
 }
 
 V.me = () => {
-  const p = prof(), t = targets(), last = store.get('last', 0);
+  const p = prof(), t = targets(), last = store.get('last', 0), lw = weights().at(-1);
   const inp = (k, lbl, type = 'number', ph = '') => `<label class="field"><span>${lbl}</span><input class="in" type="${type}" value="${esc(p[k] ?? '')}" placeholder="${ph}" onchange="setProf('${k}',this.value);draw()"></label>`;
   return {
     title: 'Cá nhân',
@@ -677,10 +683,11 @@ V.me = () => {
         <div class="field"><span class="label" style="display:block;margin-bottom:4px">Giới tính</span>${seg([['m', 'Nam'], ['f', 'Nữ']], p.sex || 'm', 'setProf_sex')}</div>
         <div class="grid2" style="margin:0">${inp('age', 'Tuổi', 'number', '25')}${inp('height', 'Chiều cao (cm)', 'number', '170')}</div></div>
       <div class="card"><div class="label" style="margin-bottom:10px">Cân nặng & mục tiêu</div>
-        <div class="grid2" style="margin:0">
-          <label class="field"><span>Cân nặng hôm nay (${unit()})</span><input class="in" type="number" inputmode="decimal" step="0.1" value="${lastWeight() ? +toU(lastWeight()).toFixed(1) : ''}" placeholder="VD: 70" onchange="saveTodayWeight(this.value)"></label>
-          <label class="field"><span>Cân nặng mục tiêu (${unit()})</span><input class="in" type="number" inputmode="decimal" step="0.5" value="${p.targetKg ? +toU(p.targetKg).toFixed(1) : ''}" placeholder="VD: 75" onchange="setProf('targetKg',this.value?Math.round(fromU(+this.value)*10)/10:'');draw()"></label>
-        </div>
+        <div class="between" style="margin-bottom:16px"><div><div class="muted" style="font-size:14px">Cân nặng hiện tại</div>
+            <div style="font:400 28px/1.3 var(--display)">${lw ? `${nf(toU(lw.kg))} <span class="muted" style="font:500 15px 'Be Vietnam Pro'">${unit()}</span>` : '—'}</div>
+            <div class="muted" style="font-size:13px">${lw ? `${lw.time ? 'lúc ' + esc(lw.time) + ' · ' : ''}${new Date(lw.date + 'T00:00').toLocaleDateString('vi-VN')}` : 'Chưa khai báo'}</div></div>
+          <button class="btn sm" onclick="weightSheet()">Khai báo cân nặng</button></div>
+        <label class="field"><span>Cân nặng mục tiêu (${unit()})</span><input class="in" type="number" inputmode="decimal" step="0.5" value="${p.targetKg ? +toU(p.targetKg).toFixed(1) : ''}" placeholder="VD: 75" onchange="setProf('targetKg',this.value?Math.round(fromU(+this.value)*10)/10:'');draw()"></label>
         ${t.goal !== 'maintain' && p.targetKg ? `<div class="field"><span class="label" style="display:block;margin-bottom:4px">Tốc độ ${t.goal === 'bulk' ? 'tăng' : 'giảm'} mỗi tuần</span>${seg(t.goal === 'bulk' ? [['0.25', 'Chậm 0,25kg'], ['0.5', 'Nhanh 0,5kg']] : [['0.25', 'Nhẹ 0,25kg'], ['0.5', 'Vừa 0,5kg'], ['0.75', 'Nhanh 0,75kg']], String(t.pace), 'setProf_pace')}</div>` : ''}
         <div class="field"><span class="label" style="display:block;margin-bottom:4px">Mức vận động ngoài giờ tập</span>${seg([['low', 'Ít (văn phòng)'], ['mid', 'Vừa'], ['high', 'Nhiều']], p.activity || 'mid', 'setProf_activity')}</div>
         <div class="card" style="background:var(--card2);box-shadow:none;margin:0 0 12px">
@@ -702,10 +709,6 @@ V.me = () => {
 };
 // seg() gọi fn('giá trị') → bọc setProf cho từng trường
 ['sex', 'goal', 'theme', 'unit', 'pace', 'activity'].forEach(k => window['setProf_' + k] = v => { setProf(k, v); draw(); });
-function saveTodayWeight(v) {
-  if (!+v) return;
-  put('WeightLog', { id: 'w' + today(), date: today(), kg: Math.round(fromU(+v) * 100) / 100 }); draw(); toast('Đã cập nhật cân nặng');
-}
 function customList() {
   const list = rows('ExerciseLibrary');
   openSheet(`<h2>Bài tập riêng</h2><div class="list">${list.map(r => `<div class="item"><div class="grow"><b>${esc(r.name)}</b><div class="muted" style="font-size:14px">${MUSCLE[r.muscle] || ''} · ${EQUIP[r.equipment] || ''}</div></div><button class="x" onclick="del('ExerciseLibrary','${r.id}');customList()">${IC.x}</button></div>`).join('') || '<div class="empty">Chưa có bài tự tạo</div>'}</div>
@@ -748,4 +751,4 @@ addEventListener('online', queueSync);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) queueSync(); });
 applyTheme(); draw(); loadEx();
 if (AUTH) sync();
-if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' });

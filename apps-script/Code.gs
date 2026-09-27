@@ -8,7 +8,7 @@ const SHEETS = {
   Schedule:        ['id', 'day', 'time', 'name', 'exercises'],
   Sessions:        ['id', 'date', 'name', 'start', 'end'],
   WorkoutLog:      ['id', 'date', 'exercise', 'set', 'reps', 'kg', 'rpe'],
-  WeightLog:       ['id', 'date', 'kg'],
+  WeightLog:       ['id', 'date', 'kg', 'time'],
   BodyMeasurement: ['id', 'date', 'waist', 'chest', 'arm', 'photo'],
   Recovery:        ['id', 'date', 'sleep', 'soreness'],
   ExerciseLibrary: ['id', 'name', 'muscle', 'equipment', 'image'],

@@ -45,6 +45,7 @@ body.deep #top h1 { font-size: 22px; white-space: normal; display: -webkit-box; 
 #screen { padding: 4px 20px calc(120px + env(safe-area-inset-bottom)); view-transition-name: screen; }
 .icon-btn { width: 44px; height: 44px; border: 0; background: none; border-radius: 12px; display: grid; place-items: center; cursor: pointer; }
 .icon-btn:active { background: var(--card2); }
+.card .icon-btn, .card > .between > svg:last-child { color: var(--acc); }
 
 /* Tabs */
 #tabs {
@@ -55,7 +56,8 @@ body.deep #top h1 { font-size: 22px; white-space: normal; display: -webkit-box; 
 }
 #tabs button { border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 0; color: var(--muted); cursor: pointer; position: relative; z-index: 1; transition: color .25s; }
 #tabs button b { font-size: 12px; font-weight: 600; }
-#tabs button.on { color: var(--text); }
+#tabs button.on { color: var(--acc); }
+:root:not([data-theme="light"]) #tabs button.on b { color: var(--text); }
 #tabs button.on svg { animation: pop .35s var(--spring); }
 #tab-ind { position: absolute; top: 8px; height: 56px; width: calc((100% - 16px) / 5); left: 8px; border-radius: 18px; background: var(--acc-soft); transition: transform .4s var(--spring); }
 
@@ -114,7 +116,7 @@ body.deep #top h1 { font-size: 22px; white-space: normal; display: -webkit-box; 
 .sec { font: 400 20px/1.3 var(--display); letter-spacing: .01em; color: var(--text); margin: 26px 4px 12px; }
 .up { color: var(--good); } .down { color: var(--bad); }
 .pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 99px; font-size: 13px; font-weight: 600; background: var(--card2); color: var(--muted); }
-.pill.acc { background: var(--acc-soft); color: var(--text); }
+.pill.acc { background: var(--acc-soft); color: var(--acc); font-weight: 700; }
 .pill.good { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
 .ellip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .empty { text-align: center; color: var(--muted); padding: 40px 16px; }
@@ -155,7 +157,7 @@ body.deep #top h1 { font-size: 22px; white-space: normal; display: -webkit-box; 
 @keyframes xfade { 0%, 35% { opacity: 0; } 50%, 85% { opacity: 1; } 100% { opacity: 0; } }
 ol.steps { padding-left: 20px; margin: 8px 0 0; color: var(--muted); }
 ol.steps li { margin: 6px 0; }
-details summary { cursor: pointer; font-weight: 600; list-style: none; }
+details summary { cursor: pointer; font-weight: 600; list-style: none; color: var(--acc); }
 details summary::after { content: '＋'; float: right; color: var(--muted); transition: transform .3s; }
 details[open] summary::after { transform: rotate(45deg); }
 
@@ -178,14 +180,15 @@ input.in[type=number] { font-variant-numeric: tabular-nums; }
 .btn { border: 0; border-radius: 16px; min-height: 54px; padding: 14px 20px; font-size: 16px; font-weight: 700; background: var(--acc); color: var(--acc-ink); cursor: pointer; transition: transform .15s, filter .2s; width: 100%; }
 .btn:active { transform: scale(.97); }
 .btn.ghost { background: var(--card2); color: var(--text); }
+.btn.soft { background: var(--acc-soft); color: var(--acc); }
 .btn.danger { background: none; color: var(--bad); }
 .btn.sm { width: auto; min-height: 44px; padding: 10px 18px; font-size: 15px; border-radius: 14px; }
 .seg { display: flex; background: var(--card2); border-radius: 16px; padding: 4px; margin-bottom: 16px; position: relative; }
 .seg button { flex: 1; border: 0; background: none; min-height: 42px; padding: 9px 6px; border-radius: 12px; font-weight: 600; font-size: 14px; line-height: 1.3; color: var(--muted); cursor: pointer; transition: color .2s, background .25s; }
-.seg button.on { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+.seg button.on { background: var(--acc); color: var(--acc-ink); box-shadow: 0 4px 14px color-mix(in srgb, var(--acc) 30%, transparent); }
 .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin: 0 -20px 12px; padding-left: 20px; padding-right: 20px; scrollbar-width: none; }
 .chips button { flex: none; border: 1.5px solid var(--line); background: var(--card); border-radius: 99px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; }
-.chips button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.chips button.on { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
 .list > .item { display: flex; align-items: center; gap: 12px; padding: 16px 0; border-top: 1px solid var(--line); }
 .list > .item:first-child { border-top: 0; }
 .item > .grow { flex: 1; min-width: 0; }
