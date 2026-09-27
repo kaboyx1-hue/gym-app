@@ -7,7 +7,12 @@ const MUSCLE = { chest: 'Ngực', shoulders: 'Vai', triceps: 'Tay sau', biceps: 
 const EQUIP = { barbell: 'Tạ đòn', dumbbell: 'Tạ đơn', cable: 'Cáp', machine: 'Máy', 'body only': 'Không dụng cụ', kettlebells: 'Tạ ấm', bands: 'Dây kháng lực', 'e-z curl bar': 'Đòn EZ', 'exercise ball': 'Bóng tập', 'medicine ball': 'Bóng tạ', 'foam roll': 'Con lăn', other: 'Khác' };
 const LEVEL = { beginner: 'Cơ bản', intermediate: 'Trung bình', expert: 'Nâng cao' };
 const DAYS = ['', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
-const POPULAR = ['Barbell_Bench_Press_-_Medium_Grip', 'Barbell_Full_Squat', 'Barbell_Deadlift', 'Pullups', 'Standing_Military_Press', 'Bent_Over_Barbell_Row', 'Wide-Grip_Lat_Pulldown', 'Leg_Press', 'Romanian_Deadlift', 'Dumbbell_Bench_Press', 'Incline_Dumbbell_Press', 'Dumbbell_Shoulder_Press', 'Side_Lateral_Raise', 'Barbell_Curl', 'Hammer_Curls', 'Triceps_Pushdown', 'Dips_-_Chest_Version', 'Seated_Cable_Rows', 'One-Arm_Dumbbell_Row', 'Face_Pull', 'Barbell_Hip_Thrust', 'Dumbbell_Lunges', 'Lying_Leg_Curls', 'Leg_Extensions', 'Standing_Calf_Raises', 'Goblet_Squat', 'Cable_Crossover', 'Dumbbell_Flyes', 'Pushups', 'Plank', 'Hanging_Leg_Raise', 'Cable_Crunch'];
+// Bài phổ biến mà thư viện gốc không có (chưa có ảnh minh hoạ)
+const EXTRA = [
+  { id: 'x_Cable_Lateral_Raise', name: 'Cable Lateral Raise (standing, one arm)', primaryMuscles: ['shoulders'], secondaryMuscles: ['traps'], equipment: 'cable', level: 'beginner', category: 'strength', images: [],
+    vi: { n: 'Nâng vai ngang cáp (đứng, một tay)', s: ['Đặt ròng rọc ở vị trí thấp nhất, gắn tay cầm đơn. Đứng nghiêng người, tay tập ở xa máy, cầm tay cầm bắt chéo trước người.', 'Hơi gập khuỷu tay, siết cơ bụng, giữ thân thẳng. Đây là tư thế bắt đầu.', 'Thở ra, nâng tay sang ngang tới ngang vai, dẫn bằng khuỷu tay, không nhún vai.', 'Dừng 1 giây ở trên, hít vào và hạ chậm về tư thế bắt đầu, giữ căng cáp suốt động tác.', 'Làm đủ số lần rồi đổi tay.'] } },
+];
+const POPULAR = ['x_Cable_Lateral_Raise', 'Cable_Seated_Lateral_Raise', 'Barbell_Bench_Press_-_Medium_Grip', 'Barbell_Full_Squat', 'Barbell_Deadlift', 'Pullups', 'Standing_Military_Press', 'Bent_Over_Barbell_Row', 'Wide-Grip_Lat_Pulldown', 'Leg_Press', 'Romanian_Deadlift', 'Dumbbell_Bench_Press', 'Incline_Dumbbell_Press', 'Dumbbell_Shoulder_Press', 'Side_Lateral_Raise', 'Barbell_Curl', 'Hammer_Curls', 'Triceps_Pushdown', 'Dips_-_Chest_Version', 'Seated_Cable_Rows', 'One-Arm_Dumbbell_Row', 'Face_Pull', 'Barbell_Hip_Thrust', 'Dumbbell_Lunges', 'Lying_Leg_Curls', 'Leg_Extensions', 'Standing_Calf_Raises', 'Goblet_Squat', 'Cable_Crossover', 'Dumbbell_Flyes', 'Pushups', 'Plank', 'Hanging_Leg_Raise', 'Cable_Crunch'];
 // Món Việt: [tên, kcal, protein, carb, fat, khẩu phần g] trên 100g — số ước tính, đủ theo dõi xu hướng
 const FOODS = [
   ['Cơm trắng', 130, 2.7, 28, 0.3, 150], ['Cơm gạo lứt', 112, 2.6, 23.5, 0.9, 150], ['Xôi trắng', 175, 3.5, 36, 1.5, 150],
@@ -213,7 +218,8 @@ async function loadEx() {
       fetch(EXDB + 'dist/exercises.json').then(r => r.json()),
       fetch('exercises-vi.json').then(r => r.ok ? r.json() : {}).catch(() => ({})), // tên + hướng dẫn tiếng Việt
     ]);
-    EX = new Map(list.map(e => [e.id, { id: e.id, name: vi[e.id]?.n || e.name, en: e.name, muscles: e.primaryMuscles, second: e.secondaryMuscles, equipment: e.equipment, level: e.level, category: e.category, steps: vi[e.id]?.s || e.instructions, imgs: e.images.map(p => EXDB + 'exercises/' + p) }]));
+    list.push(...EXTRA);
+    EX = new Map(list.map(e => [e.id, { id: e.id, name: vi[e.id]?.n || e.vi?.n || e.name, en: e.name, muscles: e.primaryMuscles, second: e.secondaryMuscles, equipment: e.equipment, level: e.level, category: e.category, steps: vi[e.id]?.s || e.vi?.s || e.instructions, imgs: e.images.map(p => EXDB + 'exercises/' + p) }]));
     if (AUTH && !document.activeElement?.matches('input,select,textarea')) draw();
     if (pickCb) pickList();
   } catch { toast('Không tải được thư viện bài tập — kiểm tra mạng'); }
@@ -223,6 +229,7 @@ function ex(id) {
   if (c) return { id, name: c.name, muscles: [c.muscle], second: [], equipment: c.equipment, level: '', steps: [], imgs: c.image ? [c.image] : [], custom: true };
   return EX?.get(id) || { id, name: id.replace(/_/g, ' '), muscles: [], second: [], steps: [], imgs: [], loading: !EX };
 }
+const fold = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd'); // bỏ dấu để tìm
 const allEx = () => [...rows('ExerciseLibrary').map(r => ex(r.id)), ...(EX ? EX.values() : [])];
 const thumb = e => e.imgs[0] ? `<img class="thumb" loading="lazy" src="${esc(e.imgs[0])}" alt="" onload="this.classList.add('ok')" onerror="this.classList.add('ok')">` : `<div class="thumb ok" style="display:grid;place-items:center">${IC.dumb}</div>`;
 const mus = e => e.muscles.map(m => MUSCLE[m] || m).join(', ');
@@ -506,9 +513,9 @@ function openPicker(cb) {
 function pickList() {
   const el = $('#plist'); if (!el) return;
   if (!EX) { el.innerHTML = '<div class="empty">Đang tải thư viện…</div>'; return; }
-  const q = pickQ.trim().toLowerCase();
+  const q = fold(pickQ.trim()), words = q.split(/\s+/).filter(Boolean);
   let list = allEx();
-  if (q) list = list.filter(e => (e.name + ' ' + (e.en || '') + ' ' + mus(e) + ' ' + e.muscles.join(' ')).toLowerCase().includes(q));
+  if (q) list = list.filter(e => { const hay = fold([e.name, e.en, mus(e), e.muscles.join(' '), e.equipment, EQUIP[e.equipment]].join(' ')); return words.every(w => hay.includes(w)); });
   if (pickM) list = list.filter(e => e.muscles.includes(pickM));
   if (!q && !pickM) list = [...rows('ExerciseLibrary').map(r => ex(r.id)), ...POPULAR.map(id => EX.get(id)).filter(Boolean)];
   else list.sort((a, b) => (POPULAR.includes(b.id) - POPULAR.includes(a.id)) || ((b.category === 'strength') - (a.category === 'strength')));
