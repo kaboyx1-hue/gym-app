@@ -1,5 +1,7 @@
 'use strict';
 // ===== Hằng số =====
+const API = 'https://script.google.com/macros/s/AKfycbzKIgUwLDVL47aOICj-ciDLXGXbF4OkTdzFhFM-3hYK3XkUuUlSnGHUcroUXMiaC9z4/exec'; // chặn bằng mật khẩu
+const OWNER = 'Mr. Henry';
 const EXDB = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/'; // 876 bài tập + ảnh, public domain
 const MUSCLE = { chest: 'Ngực', shoulders: 'Vai', triceps: 'Tay sau', biceps: 'Tay trước', forearms: 'Cẳng tay', lats: 'Xô', 'middle back': 'Lưng giữa', 'lower back': 'Lưng dưới', traps: 'Cầu vai', abdominals: 'Bụng', quadriceps: 'Đùi trước', hamstrings: 'Đùi sau', glutes: 'Mông', calves: 'Bắp chân', adductors: 'Đùi trong', abductors: 'Đùi ngoài', neck: 'Cổ' };
 const EQUIP = { barbell: 'Tạ đòn', dumbbell: 'Tạ đơn', cable: 'Cáp', machine: 'Máy', 'body only': 'Không dụng cụ', kettlebells: 'Tạ ấm', bands: 'Dây kháng lực', 'e-z curl bar': 'Đòn EZ', 'exercise ball': 'Bóng tập', 'medicine ball': 'Bóng tạ', 'foam roll': 'Con lăn', other: 'Khác' };
@@ -258,9 +260,8 @@ V.home = () => {
   const ago = ws.filter(w => w.date <= addDays(td, -7)).at(-1), delta = lw && ago ? lw.kg - ago.kg : null;
   const s = sched(dow(td)), sess = session(td), st = streak(), hw = heavyWeeks(), rec = rows('Recovery').find(r => r.date === td);
   const status = sess?.end ? `<span class="pill good">✓ Đã tập · ${dur(sessSecs(sess))}</span>` : sess ? `<span class="pill acc">Đang tập…</span>` : schedIds(s).length ? `<span class="pill">Chưa tập${s.time ? ' · ' + s.time : ''}</span>` : `<span class="pill">Ngày nghỉ</span>`;
-  const h = new Date().getHours(), hi = h < 11 ? 'Chào buổi sáng' : h < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
   return {
-    title: `${hi}, ${p.name || AUTH.name || 'bạn'}`,
+    title: `Xin chào ${p.name || OWNER}`,
     html: `<div class="stagger">
       <div class="muted" style="margin:-4px 4px 12px">${new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
       ${hw >= 5 ? `<div class="banner"><b>Đã tập nặng ${hw} tuần liền.</b> Cân nhắc 1 tuần deload: giữ bài, giảm ~40% số set/mức tạ để cơ thể hồi phục.</div>` : ''}
@@ -627,7 +628,7 @@ V.me = () => {
   return {
     title: 'Cá nhân',
     html: `<div class="stagger">
-      <div class="card">${inp('name', 'Tên', 'text', AUTH.name)}
+      <div class="card">${inp('name', 'Tên hiển thị', 'text', OWNER)}
         <div class="field"><span class="label" style="display:block;margin-bottom:4px">Giới tính</span>${seg([['m', 'Nam'], ['f', 'Nữ']], p.sex || 'm', 'setProf_sex')}</div>
         <div class="grid2" style="margin:0">${inp('age', 'Tuổi', 'number', '25')}${inp('height', 'Chiều cao (cm)', 'number', '170')}</div></div>
       <div class="card"><div class="label" style="margin-bottom:8px">Giai đoạn</div>${seg([['bulk', 'Bulk (tăng)'], ['maintain', 'Giữ'], ['cut', 'Cut (giảm)']], p.goal || 'maintain', 'setProf_goal')}
@@ -659,26 +660,18 @@ function drawLogin() {
   $('#title').textContent = ''; $('#fab').classList.add('hide'); setSync('off'); $('#tabs').style.display = 'none';
   $('#screen').innerHTML = `<form class="login" onsubmit="login(this);return false">
     <div class="logo">${IC.dumb}</div>
-    <h1 style="font-size:30px;margin:0 0 4px;letter-spacing:-.02em">Gym Log</h1>
-    <p class="muted" style="margin:0 0 24px">Lịch tập, cân nặng, dinh dưỡng — dữ liệu nằm trong Google Sheet của bạn.</p>
-    <label class="field"><span>Tên của bạn</span><input class="in" name="name" required autocomplete="name"></label>
-    <label class="field"><span>URL Apps Script (Web app)</span><input class="in" name="api" type="url" placeholder="https://script.google.com/macros/s/…/exec"></label>
-    <label class="field"><span>Mã cá nhân</span><input class="in" name="key" type="password" autocomplete="current-password"></label>
-    <button class="btn" id="lbtn">Vào app</button>
-    <p class="muted" style="font-size:12px;text-align:center">Bỏ trống URL để dùng thử offline trên máy này.</p></form>`;
+    <h1 style="font-size:30px;margin:0 0 24px;letter-spacing:-.02em">Xin chào ${OWNER}</h1>
+    <label class="field"><span>Mật khẩu</span><input class="in" name="key" type="password" autocomplete="current-password" required autofocus></label>
+    <button class="btn" id="lbtn">Vào app</button></form>`;
 }
 async function login(f) {
-  const a = { name: f.name.value.trim(), api: f.api.value.trim(), key: f.key.value };
-  if (a.api) {
-    const b = $('#lbtn'); b.disabled = true; b.textContent = 'Đang kết nối…';
-    AUTH = a;
-    try { DATA = norm((await api({ ops: [] })).data); }
-    catch (e) { AUTH = null; b.disabled = false; b.textContent = 'Vào app'; toast(e.message === 'Failed to fetch' ? 'Không kết nối được URL' : e.message); return false; }
-  }
-  AUTH = a; store.set('auth', a); store.set('last', Date.now()); save();
-  if (!prof().name) setProf('name', a.name);
+  const a = { name: OWNER, api: API, key: f.key.value }, b = $('#lbtn');
+  b.disabled = true; b.textContent = 'Đang kiểm tra…';
+  AUTH = a;
+  try { DATA = norm((await api({ ops: [] })).data); }
+  catch (e) { AUTH = null; b.disabled = false; b.textContent = 'Vào app'; toast(/Sai mã/.test(e.message) ? 'Sai mật khẩu' : 'Không kết nối được, thử lại'); return; }
+  store.set('auth', a); store.set('last', Date.now()); save();
   $('#tabs').style.display = ''; applyTheme(); draw();
-  return false;
 }
 
 function applyTheme() {
