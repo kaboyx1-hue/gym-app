@@ -250,6 +250,7 @@ function blurIn(el, text) {
   let i = 0;
   el.setAttribute('aria-label', text); el.classList.add('bi');
   el.innerHTML = text.normalize('NFC').split(' ').map(w => `<span class="w" aria-hidden="true">${Array.from(w).map(c => `<span class="c" style="--i:${i++}">${esc(c)}</span>`).join('')}</span>`).join(' ');
+  clearTimeout(el._bt); el._bt = setTimeout(() => { el.textContent = text; el.classList.remove('bi'); }, 800 + i * 28); // xong hiệu ứng → chữ thường để xuống dòng/cắt đúng
 }
 function animateIn() { // thanh/vòng tiến độ chạy từ 0, số đếm lên
   document.querySelectorAll('[data-w]').forEach(el => el.style.width = el.dataset.w);
@@ -303,24 +304,24 @@ V.home = () => {
       ${hw >= 5 ? `<div class="banner"><b>Đã tập nặng ${hw} tuần liền.</b> Cân nhắc 1 tuần deload: giữ bài, giảm ~40% số set/mức tạ để cơ thể hồi phục.</div>` : ''}
       ${rec?.soreness >= 8 ? `<div class="banner"><b>Đau nhức ${rec.soreness}/10.</b> Hôm nay nên tập nhẹ hoặc đổi nhóm cơ.</div>` : ''}
       <div class="grid2">
-        <div class="card"><div class="label">Chuỗi ngày</div><div class="big"><span data-count="${st}">0</span><small>ngày</small></div><div class="muted" style="font-size:12px">${st ? 'Giữ lửa nhé' : 'Ghi gì đó hôm nay để bắt đầu'}</div></div>
+        <div class="card"><div class="label">Chuỗi ngày</div><div class="big"><span data-count="${st}">0</span><small>ngày</small></div><div class="muted" style="font-size:13px">${st ? 'Giữ lửa nhé' : 'Ghi gì đó hôm nay để bắt đầu'}</div></div>
         <div class="card"><div class="label">Cân nặng</div><div class="big">${lw ? `<span data-count="${toU(lw.kg)}" data-dec="1">0</span><small>${unit()}</small>` : '—'}</div>
-          <div style="font-size:12px" class="${delta == null ? 'muted' : delta > 0 ? 'up' : 'down'}">${delta == null ? 'Chưa đủ dữ liệu 7 ngày' : (delta > 0 ? '▲ ' : '▼ ') + nf(Math.abs(toU(delta))) + ' ' + unit() + ' / 7 ngày'}</div>
+          <div style="font-size:13px" class="${delta == null ? 'muted' : delta > 0 ? 'up' : 'down'}">${delta == null ? 'Chưa đủ dữ liệu 7 ngày' : (delta > 0 ? '▲ ' : '▼ ') + nf(Math.abs(toU(delta))) + ' ' + unit() + ' / 7 ngày'}</div>
           ${chart(ws.slice(-14).map(w => ({ x: w.date, y: w.kg })), true)}</div>
       </div>
       <div class="card"><div class="row">
-        ${ring(e.kcal, t.kcal, `<div><div style="font-weight:800;font-size:20px" data-count="${Math.round(e.kcal)}">0</div><div class="muted" style="font-size:11px">/ ${nf(t.kcal, 0)} kcal</div></div>`)}
+        ${ring(e.kcal, t.kcal, `<div><div style="font:400 26px/1.2 var(--display)" data-count="${Math.round(e.kcal)}">0</div><div class="muted" style="font-size:12.5px">/ ${nf(t.kcal, 0)} kcal</div></div>`)}
         <div class="grow">
           <div class="macro"><span>Protein</span>${bar(e.protein, t.protein)}<span>${nf(e.protein, 0)}/${t.protein}g</span></div>
           <div class="macro"><span>Carb</span>${bar(e.carb, t.carb)}<span>${nf(e.carb, 0)}/${t.carb}g</span></div>
           <div class="macro"><span>Fat</span>${bar(e.fat, t.fat)}<span>${nf(e.fat, 0)}/${t.fat}g</span></div>
         </div></div>
-        <div class="muted" style="font-size:12px;margin-top:8px">Còn lại ${nf(Math.max(0, t.kcal - e.kcal), 0)} kcal${burned(td) ? ` · đốt ~${burned(td)} kcal khi tập` : ''}</div>
+        <div class="muted" style="font-size:13px;margin-top:8px">Còn lại ${nf(Math.max(0, t.kcal - e.kcal), 0)} kcal${burned(td) ? ` · đốt ~${burned(td)} kcal khi tập` : ''}</div>
       </div>
       <div class="card tap" onclick="openToday()">
         <div class="between"><div class="label">Buổi tập hôm nay</div>${status}</div>
-        <div style="font-size:20px;font-weight:700;margin-top:6px">${esc(s.name) || (schedIds(s).length ? DAYS[dow(td)] : 'Nghỉ ngơi')}</div>
-        <div class="muted" style="font-size:13px">${schedIds(s).slice(0, 4).map(id => esc(ex(id).name)).join(' · ') || 'Không có bài tập nào được xếp'}</div>
+        <div style="font:400 24px/1.3 var(--display);margin-top:8px">${esc(s.name) || (schedIds(s).length ? DAYS[dow(td)] : 'Nghỉ ngơi')}</div>
+        <div class="muted" style="font-size:14px">${schedIds(s).slice(0, 4).map(id => esc(ex(id).name)).join(' · ') || 'Không có bài tập nào được xếp'}</div>
       </div>
       ${rec ? `<div class="card"><div class="label">Phục hồi hôm nay</div><div class="row" style="margin-top:6px"><div class="grow"><b>${nf(rec.sleep)}</b> giờ ngủ</div><div class="grow">Đau nhức <b>${rec.soreness}</b>/10</div></div></div>` : ''}
     </div>`,
@@ -334,7 +335,7 @@ V.workout = () => {
     return `<div class="card tap day ${date === td ? 'today' : ''}" onclick="push('day',{day:${d}})">
       <div class="dnum">${d === 7 ? 'CN' : 'T' + (d + 1)}<small>${dm(date)}</small></div>
       <div class="grow" style="flex:1;min-width:0"><b class="ellip" style="display:block">${esc(s.name) || (n ? DAYS[d] : 'Nghỉ')}</b>
-        <div class="muted" style="font-size:13px">${n ? `${n} bài${s.time ? ' · ' + s.time : ''}` : 'Chạm để xếp bài tập'}</div></div>
+        <div class="muted" style="font-size:14px">${n ? `${n} bài${s.time ? ' · ' + s.time : ''}` : 'Chạm để xếp bài tập'}</div></div>
       ${sess?.end ? `<div class="check">${IC.ok}</div>` : IC.chev}</div>`;
   }).join('');
   return {
@@ -366,19 +367,19 @@ V.day = ({ day }) => {
   if (isToday) {
     sessHtml = !sess ? `<button class="btn" onclick="startSession(${day})">Bắt đầu buổi tập</button>`
       : !sess.end ? `<div class="between"><div><div class="label">Đang tập · từ ${sess.start.slice(0, 5)}</div><div class="timer" id="timer">${clock(sessSecs(sess))}</div></div><button class="btn sm" onclick="endSession()">Kết thúc</button></div>`
-      : `<div class="between"><div><div class="label">Đã hoàn thành</div><div style="font-size:20px;font-weight:800">${dur(sessSecs(sess))}</div><div class="muted" style="font-size:13px">${sess.start.slice(0, 5)} → ${sess.end.slice(0, 5)} · ~${burned(td)} kcal</div></div><div class="check" style="width:40px;height:40px">${IC.ok}</div></div>`;
+      : `<div class="between"><div><div class="label">Đã hoàn thành</div><div style="font:400 26px/1.3 var(--display)">${dur(sessSecs(sess))}</div><div class="muted" style="font-size:14px">${sess.start.slice(0, 5)} → ${sess.end.slice(0, 5)} · ~${burned(td)} kcal</div></div><div class="check" style="width:40px;height:40px">${IC.ok}</div></div>`;
   } else if (past) sessHtml = `<div class="muted">Buổi ${dm(date)}: ${past.start.slice(0, 5)} → ${(past.end || '').slice(0, 5)} · ${dur(sessSecs(past))}</div>`;
   const list = ids.map((id, i) => {
     const e = ex(id), tdSets = rows('WorkoutLog').filter(r => r.exercise === id && r.date === td).length;
     const last = logsOf(id).filter(r => r.date < td).at(-1);
     return `<div class="card tap ex" onclick="push('ex',{id:'${esc(id)}'})">${thumb(e)}
-      <div style="min-width:0;flex:1"><b class="ellip">${esc(e.name)}</b><div class="muted ellip" style="font-size:13px">${mus(e) || '&nbsp;'}</div>
-        <div style="font-size:12px;margin-top:2px">${tdSets ? `<span class="pill good">${tdSets} set hôm nay</span>` : last ? `<span class="muted">Lần trước: ${W(last.kg)} × ${last.reps}</span>` : '<span class="muted">Chưa có lịch sử</span>'}</div></div>
+      <div style="min-width:0;flex:1"><b class="ellip">${esc(e.name)}</b><div class="muted ellip" style="font-size:14px">${mus(e) || '&nbsp;'}</div>
+        <div style="font-size:13px;margin-top:2px">${tdSets ? `<span class="pill good">${tdSets} set hôm nay</span>` : last ? `<span class="muted">Lần trước: ${W(last.kg)} × ${last.reps}</span>` : '<span class="muted">Chưa có lịch sử</span>'}</div></div>
       <button class="x" aria-label="Bỏ bài" onclick="event.stopPropagation();removeEx(${day},${i})">${IC.x}</button></div>`;
   }).join('');
   return {
     title: s.name || DAYS[day],
-    html: `<div class="card"><div class="between"><div><div class="label">${DAYS[day]} · ${dm(date)}</div><div style="font-size:18px;font-weight:700">${esc(s.name) || 'Chưa đặt tên buổi'}${s.time ? ` <span class="muted" style="font-weight:500">· ${s.time}</span>` : ''}</div></div>
+    html: `<div class="card"><div class="between"><div><div class="label">${DAYS[day]} · ${dm(date)}</div><div style="font:400 22px/1.3 var(--display)">${esc(s.name) || 'Chưa đặt tên buổi'}${s.time ? ` <span class="muted" style="font-weight:500">· ${s.time}</span>` : ''}</div></div>
         <button class="icon-btn" aria-label="Sửa" onclick="daySheet(${day})">${IC.edit}</button></div>
         ${sessHtml ? `<div style="margin-top:12px">${sessHtml}</div>` : ''}</div>
       <div class="sec">Bài tập (${ids.length})</div>
@@ -429,7 +430,7 @@ V.ex = ({ id }) => {
       ${e.loading ? '<div class="muted" style="margin-bottom:12px">Đang tải thư viện bài tập…</div>' : ''}
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${e.muscles.map(m => `<span class="pill acc">${MUSCLE[m] || esc(m)}</span>`).join('')}${e.second.map(m => `<span class="pill">${MUSCLE[m] || m}</span>`).join('')}${e.equipment ? `<span class="pill">${EQUIP[e.equipment] || esc(e.equipment)}</span>` : ''}${e.level ? `<span class="pill">${LEVEL[e.level]}</span>` : ''}</div>
       <div class="card coach"><div class="label" style="margin-bottom:4px">Huấn luyện viên</div>${coach}</div>
-      <div class="card"><div class="between"><div class="label">Hôm nay</div><span class="muted" style="font-size:12px">${now.length} set</span></div>
+      <div class="card"><div class="between"><div class="label">Hôm nay</div><span class="muted" style="font-size:13px">${now.length} set</span></div>
         ${now.length ? `<table class="sets"><tr><th>Set</th><th>${unit()}</th><th>Reps</th><th>RPE</th><th></th></tr>${now.map((r, i) => `<tr class="${r.id === lastSaved ? 'new' : ''}"><td>${i + 1}</td><td>${r.kg ? nf(toU(r.kg)) : 'BW'}</td><td>${r.reps}</td><td>${r.rpe || '–'}</td><td style="text-align:right"><button class="x" onclick="delSet('${r.id}')">${IC.x}</button></td></tr>`).join('')}</table>` : ''}
         <form class="logger" style="margin-top:12px" onsubmit="return saveSet(this,'${esc(id)}')">
           <label>${unit()}<input class="in" name="kg" type="number" inputmode="decimal" step="any" min="0" value="${pre.kg ? +toU(pre.kg).toFixed(1) : ''}" placeholder="0"></label>
@@ -438,8 +439,8 @@ V.ex = ({ id }) => {
           <button class="btn" style="width:52px;height:48px;padding:0;display:grid;place-items:center" aria-label="Lưu set">${IC.ok}</button>
         </form></div>
       ${all.length ? `<div class="card"><div class="label">Kỷ lục cá nhân</div><div class="grid2" style="margin:8px 0 0">
-          <div><div class="big" style="font-size:24px">${W(best.kg.kg)}</div><div class="muted" style="font-size:12px">Tạ nặng nhất × ${best.kg.reps} · ${dm(best.kg.date)}</div></div>
-          <div><div class="big" style="font-size:24px">${W(e1rm(best.e1.kg, best.e1.reps))}</div><div class="muted" style="font-size:12px">1RM ước tính · ${dm(best.e1.date)}</div></div></div>
+          <div><div class="big" style="font-size:24px">${W(best.kg.kg)}</div><div class="muted" style="font-size:13px">Tạ nặng nhất × ${best.kg.reps} · ${dm(best.kg.date)}</div></div>
+          <div><div class="big" style="font-size:24px">${W(e1rm(best.e1.kg, best.e1.reps))}</div><div class="muted" style="font-size:13px">1RM ước tính · ${dm(best.e1.date)}</div></div></div>
         ${series.length > 1 ? `<div style="margin-top:12px">${chart(series)}</div>` : ''}</div>` : ''}
       ${hist ? `<div class="card"><div class="label">Lịch sử</div><div class="list">${hist}</div></div>` : ''}
       ${e.steps.length ? `<div class="card"><details><summary>Hướng dẫn thực hiện (EN)</summary><ol class="steps">${e.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></details></div>` : ''}`,
@@ -480,7 +481,7 @@ function pickList() {
   if (pickM) list = list.filter(e => e.muscles.includes(pickM));
   if (!q && !pickM) list = [...rows('ExerciseLibrary').map(r => ex(r.id)), ...POPULAR.map(id => EX.get(id)).filter(Boolean)];
   else list.sort((a, b) => (POPULAR.includes(b.id) - POPULAR.includes(a.id)) || ((b.category === 'strength') - (a.category === 'strength')));
-  el.innerHTML = list.slice(0, 80).map(e => `<div class="item ex" style="cursor:pointer" onclick="pickCb&&pickCb('${esc(e.id)}');this.querySelector('.pk').innerHTML='${IC.ok.replace(/"/g, '&quot;')}'">${thumb(e)}<div style="flex:1;min-width:0"><b class="ellip">${esc(e.name)}</b><div class="muted ellip" style="font-size:13px">${mus(e)} · ${EQUIP[e.equipment] || e.equipment || ''}</div></div><span class="pk" style="color:var(--good)"></span></div>`).join('') || '<div class="empty">Không tìm thấy</div>';
+  el.innerHTML = list.slice(0, 80).map(e => `<div class="item ex" style="cursor:pointer" onclick="pickCb&&pickCb('${esc(e.id)}');this.querySelector('.pk').innerHTML='${IC.ok.replace(/"/g, '&quot;')}'">${thumb(e)}<div style="flex:1;min-width:0"><b class="ellip">${esc(e.name)}</b><div class="muted ellip" style="font-size:14px">${mus(e)} · ${EQUIP[e.equipment] || e.equipment || ''}</div></div><span class="pk" style="color:var(--good)"></span></div>`).join('') || '<div class="empty">Không tìm thấy</div>';
 }
 function customExSheet() {
   const cb = pickCb;
@@ -512,22 +513,22 @@ V.food = ({ seg: sg = 'log', date = today() }) => {
       <div class="between" style="margin-bottom:10px"><button class="icon-btn" onclick="setRoot({date:addDays('${date}',-1)})">${IC.left}</button>
         <b>${date === today() ? 'Hôm nay' : new Date(date + 'T00:00').toLocaleDateString('vi-VN', { weekday: 'short', day: 'numeric', month: 'numeric' })}</b>
         <button class="icon-btn" style="transform:scaleX(-1);${date >= today() ? 'visibility:hidden' : ''}" onclick="setRoot({date:addDays('${date}',1)})">${IC.left}</button></div>
-      <div class="card"><div class="row">${ring(e.kcal, t.kcal, `<div><div style="font-weight:800;font-size:20px" data-count="${Math.round(e.kcal)}">0</div><div class="muted" style="font-size:11px">/ ${t.kcal} kcal</div></div>`)}
+      <div class="card"><div class="row">${ring(e.kcal, t.kcal, `<div><div style="font:400 26px/1.2 var(--display)" data-count="${Math.round(e.kcal)}">0</div><div class="muted" style="font-size:12.5px">/ ${t.kcal} kcal</div></div>`)}
         <div class="grow"><div class="macro"><span>Protein</span>${bar(e.protein, t.protein)}<span>${nf(e.protein, 0)}/${t.protein}g</span></div>
         <div class="macro"><span>Carb</span>${bar(e.carb, t.carb)}<span>${nf(e.carb, 0)}/${t.carb}g</span></div>
         <div class="macro"><span>Fat</span>${bar(e.fat, t.fat)}<span>${nf(e.fat, 0)}/${t.fat}g</span></div></div></div></div>
       ${date === today() ? suggestCard(date) : ''}
       <div class="sec">Đã ăn (${logs.length})</div>
-      ${logs.length ? `<div class="card list stagger">${logs.map(r => `<div class="item"><div class="grow"><b>${esc(r.food)}</b><div class="muted" style="font-size:13px">${nf(r.grams, 0)}g · P ${nf(r.protein, 0)} · C ${nf(r.carb, 0)} · F ${nf(r.fat, 0)}</div></div><b>${nf(r.kcal, 0)}</b><span class="muted" style="font-size:12px">kcal</span><button class="x" onclick="del('NutritionLog','${r.id}');draw()">${IC.x}</button></div>`).join('')}</div>` : empty('Chưa ghi món nào. Bấm “Thêm món”.')}`,
+      ${logs.length ? `<div class="card list stagger">${logs.map(r => `<div class="item"><div class="grow"><b>${esc(r.food)}</b><div class="muted" style="font-size:14px">${nf(r.grams, 0)}g · P ${nf(r.protein, 0)} · C ${nf(r.carb, 0)} · F ${nf(r.fat, 0)}</div></div><b>${nf(r.kcal, 0)}</b><span class="muted" style="font-size:13px">kcal</span><button class="x" onclick="del('NutritionLog','${r.id}');draw()">${IC.x}</button></div>`).join('')}</div>` : empty('Chưa ghi món nào. Bấm “Thêm món”.')}`,
     fab: ['Thêm món', () => push('addFood', { date })],
   };
 };
 function suggestCard(date) {
   const { rem, list, needP } = suggest(date);
   if (!list.length) return rem.k < 120 ? `<div class="card coach"><b>Đã đủ calo hôm nay.</b> <span class="muted">${rem.p > 10 ? `Còn thiếu ${nf(rem.p, 0)}g protein, ưu tiên lòng trắng trứng, ức gà, whey.` : 'Giữ nhịp này nhé.'}</span></div>` : '';
-  return `<div class="card coach"><div class="between"><div class="label">Gợi ý bữa tiếp theo</div><span class="muted" style="font-size:12px">còn ${nf(rem.k, 0)} kcal · ${nf(Math.max(0, rem.p), 0)}g đạm</span></div>
-    ${needP ? '<div class="muted" style="font-size:13px;margin-top:4px">Đạm còn thiếu nhiều so với calo còn lại, nên ưu tiên món giàu đạm.</div>' : ''}
-    <div class="list" style="margin-top:4px">${list.map(x => `<div class="item" style="cursor:pointer" onclick="gramSheet('${x.f.id}',${x.g})"><div class="grow"><b>${esc(x.f.name)}</b> <span class="pill">${x.why}</span><div class="muted" style="font-size:13px">${nf(x.g, 0)}g · ${nf(x.K, 0)} kcal · P ${nf(x.P, 0)}g</div></div><span class="pill acc">+</span></div>`).join('')}</div></div>`;
+  return `<div class="card coach"><div class="between"><div class="label">Gợi ý bữa tiếp theo</div><span class="muted" style="font-size:13px">còn ${nf(rem.k, 0)} kcal · ${nf(Math.max(0, rem.p), 0)}g đạm</span></div>
+    ${needP ? '<div class="muted" style="font-size:14px;margin-top:4px">Đạm còn thiếu nhiều so với calo còn lại, nên ưu tiên món giàu đạm.</div>' : ''}
+    <div class="list" style="margin-top:4px">${list.map(x => `<div class="item" style="cursor:pointer" onclick="gramSheet('${x.f.id}',${x.g})"><div class="grow"><b>${esc(x.f.name)}</b> <span class="pill">${x.why}</span><div class="muted" style="font-size:14px">${nf(x.g, 0)}g · ${nf(x.K, 0)} kcal · P ${nf(x.P, 0)}g</div></div><span class="pill acc">+</span></div>`).join('')}</div></div>`;
 }
 const foodSeg = s => nav('tab', () => Object.assign(R.root.food, { seg: s }));
 function foods() { // món có sẵn + món trong Sheet (trùng id thì Sheet ghi đè)
@@ -541,7 +542,7 @@ function foodRows(q, pick) {
     const ra = recent.indexOf(a.name), rb = recent.indexOf(b.name);
     return (ra < 0 ? 999 : ra) - (rb < 0 ? 999 : rb) || a.name.localeCompare(b.name, 'vi');
   });
-  return list.map(f => `<div class="item" style="cursor:pointer" onclick="${pick ? `gramSheet('${f.id}')` : `foodSheet('${f.id}')`}"><div class="grow"><b>${esc(f.name)}</b><div class="muted" style="font-size:13px">${f.kcal} kcal · P ${f.protein} · C ${f.carb} · F ${f.fat} /100g</div></div>${pick ? '<span class="pill acc">+</span>' : IC.chev}</div>`).join('') || '<div class="empty">Không có món này — thêm mới ở tab Thư viện món</div>';
+  return list.map(f => `<div class="item" style="cursor:pointer" onclick="${pick ? `gramSheet('${f.id}')` : `foodSheet('${f.id}')`}"><div class="grow"><b>${esc(f.name)}</b><div class="muted" style="font-size:14px">${f.kcal} kcal · P ${f.protein} · C ${f.carb} · F ${f.fat} /100g</div></div>${pick ? '<span class="pill acc">+</span>' : IC.chev}</div>`).join('') || '<div class="empty">Không có món này — thêm mới ở tab Thư viện món</div>';
 }
 const foodLib = q => $('#flib').innerHTML = foodRows(q);
 function foodSheet(id) {
@@ -576,7 +577,7 @@ function gramSheet(id, preset) {
 }
 function gramPrev(id) {
   const f = foods().find(x => x.id === id), k = (+$('#gg').value || 0) / 100;
-  $('#gprev').innerHTML = `<div class="between"><div class="big" style="font-size:28px">${nf(f.kcal * k, 0)}<small>kcal</small></div><div class="muted" style="font-size:13px;text-align:right">P ${nf(f.protein * k)}g · C ${nf(f.carb * k)}g · F ${nf(f.fat * k)}g</div></div>`;
+  $('#gprev').innerHTML = `<div class="between"><div class="big" style="font-size:28px">${nf(f.kcal * k, 0)}<small>kcal</small></div><div class="muted" style="font-size:14px;text-align:right">P ${nf(f.protein * k)}g · C ${nf(f.carb * k)}g · F ${nf(f.fat * k)}g</div></div>`;
 }
 function saveEat(form, id) {
   const f = foods().find(x => x.id === id), g = +form.g.value, k = g / 100, date = cur().p.date || today();
@@ -597,19 +598,19 @@ V.progress = ({ seg: sg = 'weight', range = 90 }) => {
           ${ch != null ? `<div style="text-align:right"><div class="label">Thay đổi</div><b class="${ch > 0 ? 'up' : 'down'}" style="font-size:18px">${ch > 0 ? '+' : ''}${nf(ch)} ${unit()}</b></div>` : ''}</div>
         <div class="chips" style="margin:10px 0 4px">${[[30, '30 ngày'], [90, '90 ngày'], [365, '1 năm'], [0, 'Tất cả']].map(([k, l]) => `<button class="${k === range ? 'on' : ''}" onclick="setRoot({range:${k}})">${l}</button>`).join('')}</div>
         ${chart(shown.map(w => ({ x: w.date, y: toU(w.kg) })))}</div>
-        <div class="sec">Lịch sử</div>${ws.length ? `<div class="card list">${ws.slice().reverse().slice(0, 60).map((w, i, a) => { const d = a[i + 1] ? Math.round(toU(w.kg - a[i + 1].kg) * 10) / 10 : 0; return `<div class="item"><div class="grow">${new Date(w.date + 'T00:00').toLocaleDateString('vi-VN')}</div><span class="${d > 0 ? 'up' : d < 0 ? 'down' : 'muted'}" style="font-size:12px">${d ? (d > 0 ? '+' : '') + nf(d) : ''}</span><b>${nf(toU(w.kg))} ${unit()}</b><button class="x" onclick="del('WeightLog','${w.id}');draw()">${IC.x}</button></div>`; }).join('')}</div>` : empty('Chưa có số cân nào')}`,
+        <div class="sec">Lịch sử</div>${ws.length ? `<div class="card list">${ws.slice().reverse().slice(0, 60).map((w, i, a) => { const d = a[i + 1] ? Math.round(toU(w.kg - a[i + 1].kg) * 10) / 10 : 0; return `<div class="item"><div class="grow">${new Date(w.date + 'T00:00').toLocaleDateString('vi-VN')}</div><span class="${d > 0 ? 'up' : d < 0 ? 'down' : 'muted'}" style="font-size:13px">${d ? (d > 0 ? '+' : '') + nf(d) : ''}</span><b>${nf(toU(w.kg))} ${unit()}</b><button class="x" onclick="del('WeightLog','${w.id}');draw()">${IC.x}</button></div>`; }).join('')}</div>` : empty('Chưa có số cân nào')}`,
       fab: ['Cân nặng', weightSheet],
     };
   }
   if (sg === 'body') {
     const ms = rows('BodyMeasurement').slice().sort((a, b) => a.date < b.date ? -1 : 1), f = ms[0], l = ms.at(-1);
-    const cmp = (k, lbl) => `<div><div class="label">${lbl}</div><div style="font-size:22px;font-weight:800">${l?.[k] ? nf(l[k]) : '—'}<small class="muted" style="font-size:12px"> cm</small></div>${f && l && f !== l && f[k] && l[k] ? `<div style="font-size:12px" class="muted">${l[k] - f[k] > 0 ? '+' : ''}${nf(l[k] - f[k])} từ ${dm(f.date)}</div>` : ''}</div>`;
+    const cmp = (k, lbl) => `<div><div class="label">${lbl}</div><div style="font-size:22px;font-weight:800">${l?.[k] ? nf(l[k]) : '—'}<small class="muted" style="font-size:13px"> cm</small></div>${f && l && f !== l && f[k] && l[k] ? `<div style="font-size:13px" class="muted">${l[k] - f[k] > 0 ? '+' : ''}${nf(l[k] - f[k])} từ ${dm(f.date)}</div>` : ''}</div>`;
     const photos = ms.filter(m => m.photo).reverse();
     return {
       title: 'Tiến độ',
       html: head + `<div class="card"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${cmp('waist', 'Eo')}${cmp('chest', 'Ngực')}${cmp('arm', 'Tay')}</div></div>
         ${photos.length ? `<div class="sec">Ảnh tiến trình</div><div class="photos stagger">${photos.map(m => `<a href="${esc(m.photo)}" target="_blank" rel="noopener"><img src="${esc(m.photo)}" loading="lazy" alt="Ảnh ${dm(m.date)}"></a>`).join('')}</div>` : ''}
-        <div class="sec">Lịch sử</div>${ms.length ? `<div class="card list">${ms.slice().reverse().map(m => `<div class="item"><div class="grow">${new Date(m.date + 'T00:00').toLocaleDateString('vi-VN')}<div class="muted" style="font-size:13px">Eo ${nf(m.waist) || '–'} · Ngực ${nf(m.chest) || '–'} · Tay ${nf(m.arm) || '–'} cm${m.photo ? ' · có ảnh' : ''}</div></div><button class="x" onclick="del('BodyMeasurement','${m.id}');draw()">${IC.x}</button></div>`).join('')}</div>` : empty('Đo mỗi 2-4 tuần, cùng giờ, trước khi ăn')}`,
+        <div class="sec">Lịch sử</div>${ms.length ? `<div class="card list">${ms.slice().reverse().map(m => `<div class="item"><div class="grow">${new Date(m.date + 'T00:00').toLocaleDateString('vi-VN')}<div class="muted" style="font-size:14px">Eo ${nf(m.waist) || '–'} · Ngực ${nf(m.chest) || '–'} · Tay ${nf(m.arm) || '–'} cm${m.photo ? ' · có ảnh' : ''}</div></div><button class="x" onclick="del('BodyMeasurement','${m.id}');draw()">${IC.x}</button></div>`).join('')}</div>` : empty('Đo mỗi 2-4 tuần, cùng giờ, trước khi ăn')}`,
       fab: ['Số đo', bodySheet],
     };
   }
@@ -618,8 +619,8 @@ V.progress = ({ seg: sg = 'weight', range = 90 }) => {
   return {
     title: 'Tiến độ',
     html: head + (prs.length ? `<div class="stagger">${prs.map(({ e, b }) => `<div class="card ex">${thumb(e)}<div style="flex:1;min-width:0"><b class="ellip">${esc(e.name)}</b>
-        <div style="font-size:13px"><b>${W(b.kg.kg)} × ${b.kg.reps}</b> <span class="muted">· 1RM ~${W(e1rm(b.e1.kg, b.e1.reps))}</span></div>
-        <div class="muted" style="font-size:12px">Nhiều rep nhất: ${b.reps.reps} · đạt ${dm(b.e1.date)}</div></div></div>`).join('')}</div>` : empty('Kỷ lục sẽ tự xuất hiện khi bạn ghi set tập')),
+        <div style="font-size:14px"><b>${W(b.kg.kg)} × ${b.kg.reps}</b> <span class="muted">· 1RM ~${W(e1rm(b.e1.kg, b.e1.reps))}</span></div>
+        <div class="muted" style="font-size:13px">Nhiều rep nhất: ${b.reps.reps} · đạt ${dm(b.e1.date)}</div></div></div>`).join('')}</div>` : empty('Kỷ lục sẽ tự xuất hiện khi bạn ghi set tập')),
   };
 };
 const progSeg = s => nav('tab', () => Object.assign(R.root.progress, { seg: s }));
@@ -683,18 +684,18 @@ V.me = () => {
         ${t.goal !== 'maintain' && p.targetKg ? `<div class="field"><span class="label" style="display:block;margin-bottom:4px">Tốc độ ${t.goal === 'bulk' ? 'tăng' : 'giảm'} mỗi tuần</span>${seg(t.goal === 'bulk' ? [['0.25', 'Chậm 0,25kg'], ['0.5', 'Nhanh 0,5kg']] : [['0.25', 'Nhẹ 0,25kg'], ['0.5', 'Vừa 0,5kg'], ['0.75', 'Nhanh 0,75kg']], String(t.pace), 'setProf_pace')}</div>` : ''}
         <div class="field"><span class="label" style="display:block;margin-bottom:4px">Mức vận động ngoài giờ tập</span>${seg([['low', 'Ít (văn phòng)'], ['mid', 'Vừa'], ['high', 'Nhiều']], p.activity || 'mid', 'setProf_activity')}</div>
         <div class="card" style="background:var(--card2);box-shadow:none;margin:0 0 12px">
-          <div class="between"><span class="pill acc">${{ bulk: 'Bulk · tăng cân', cut: 'Cut · giảm mỡ', maintain: 'Giữ cân' }[t.goal]}</span>${t.weeks ? `<span class="muted" style="font-size:12px">~${t.weeks} tuần · dự kiến ${dm(addDays(today(), t.weeks * 7))}</span>` : ''}</div>
+          <div class="between"><span class="pill acc">${{ bulk: 'Bulk · tăng cân', cut: 'Cut · giảm mỡ', maintain: 'Giữ cân' }[t.goal]}</span>${t.weeks ? `<span class="muted" style="font-size:13px">~${t.weeks} tuần · dự kiến ${dm(addDays(today(), t.weeks * 7))}</span>` : ''}</div>
           <div style="margin-top:8px"><span class="big" style="font-size:30px">${nf(t.kcal, 0)}</span> <span class="muted">kcal/ngày</span></div>
-          <div class="muted" style="font-size:13px">Protein ${t.protein}g · Carb ${t.carb}g · Fat ${t.fat}g · tiêu hao ước tính ~${nf(t.tdee, 0)} kcal</div>
-          ${p.targetKg ? `<div class="muted" style="font-size:12px;margin-top:4px">${t.goal === 'maintain' ? 'Đã sát cân nặng mục tiêu.' : `Còn ${t.diff > 0 ? 'tăng' : 'giảm'} ${nf(Math.abs(toU(t.diff)))} ${unit()}.`}</div>` : '<div class="muted" style="font-size:12px;margin-top:4px">Nhập cân nặng mục tiêu để app tự tính calo.</div>'}
-          ${t.floored ? '<div style="font-size:12px;margin-top:4px;color:var(--warn)">Đã giữ calo ở mức tối thiểu an toàn, nên chọn tốc độ giảm chậm hơn.</div>' : ''}
+          <div class="muted" style="font-size:14px">Protein ${t.protein}g · Carb ${t.carb}g · Fat ${t.fat}g · tiêu hao ước tính ~${nf(t.tdee, 0)} kcal</div>
+          ${p.targetKg ? `<div class="muted" style="font-size:13px;margin-top:4px">${t.goal === 'maintain' ? 'Đã sát cân nặng mục tiêu.' : `Còn ${t.diff > 0 ? 'tăng' : 'giảm'} ${nf(Math.abs(toU(t.diff)))} ${unit()}.`}</div>` : '<div class="muted" style="font-size:13px;margin-top:4px">Nhập cân nặng mục tiêu để app tự tính calo.</div>'}
+          ${t.floored ? '<div style="font-size:13px;margin-top:4px;color:var(--warn)">Đã giữ calo ở mức tối thiểu an toàn, nên chọn tốc độ giảm chậm hơn.</div>' : ''}
         </div>
         ${inp('kcal', 'Tự đặt calo (để trống = app tự tính)', 'number', String(t.auto))}</div>
       <div class="card"><div class="label" style="margin-bottom:8px">Giao diện</div>${seg([['light', 'Sáng'], ['dark', 'Tối'], ['system', 'Theo hệ thống']], p.theme || 'system', 'setProf_theme')}
         <div class="label" style="margin-bottom:8px">Đơn vị</div>${seg([['kg', 'kg'], ['lbs', 'lbs']], unit(), 'setProf_unit')}</div>
-      <div class="card tap" onclick="customList()"><div class="between"><div><b>Thư viện bài tập riêng</b><div class="muted" style="font-size:13px">${rows('ExerciseLibrary').length} bài tự tạo · ${EX ? EX.size : '…'} bài có sẵn kèm hình</div></div>${IC.chev}</div></div>
+      <div class="card tap" onclick="customList()"><div class="between"><div><b>Thư viện bài tập riêng</b><div class="muted" style="font-size:14px">${rows('ExerciseLibrary').length} bài tự tạo · ${EX ? EX.size : '…'} bài có sẵn kèm hình</div></div>${IC.chev}</div></div>
       <div class="card"><div class="label" style="margin-bottom:6px">Đồng bộ Google Sheet</div>
-        <div style="font-size:14px">${AUTH.api ? `Đã kết nối · ${QUEUE.length ? `<b>${QUEUE.length}</b> thay đổi chờ gửi` : 'đã đồng bộ hết'}<div class="muted" style="font-size:12px">Lần cuối: ${last ? new Date(last).toLocaleString('vi-VN') : 'chưa'}</div>` : '<span class="muted">Chế độ offline — dữ liệu chỉ nằm trên máy này.</span>'}</div>
+        <div style="font-size:14px">${AUTH.api ? `Đã kết nối · ${QUEUE.length ? `<b>${QUEUE.length}</b> thay đổi chờ gửi` : 'đã đồng bộ hết'}<div class="muted" style="font-size:13px">Lần cuối: ${last ? new Date(last).toLocaleString('vi-VN') : 'chưa'}</div>` : '<span class="muted">Chế độ offline — dữ liệu chỉ nằm trên máy này.</span>'}</div>
         <div class="row" style="margin-top:12px">${AUTH.api ? '<button class="btn sm" onclick="sync().then(()=>{draw();toast(\'Đã đồng bộ\')})">Đồng bộ ngay</button>' : ''}<button class="btn sm ghost" onclick="logout()">Đăng xuất</button></div></div>
     </div>`,
   };
@@ -707,7 +708,7 @@ function saveTodayWeight(v) {
 }
 function customList() {
   const list = rows('ExerciseLibrary');
-  openSheet(`<h2>Bài tập riêng</h2><div class="list">${list.map(r => `<div class="item"><div class="grow"><b>${esc(r.name)}</b><div class="muted" style="font-size:13px">${MUSCLE[r.muscle] || ''} · ${EQUIP[r.equipment] || ''}</div></div><button class="x" onclick="del('ExerciseLibrary','${r.id}');customList()">${IC.x}</button></div>`).join('') || '<div class="empty">Chưa có bài tự tạo</div>'}</div>
+  openSheet(`<h2>Bài tập riêng</h2><div class="list">${list.map(r => `<div class="item"><div class="grow"><b>${esc(r.name)}</b><div class="muted" style="font-size:14px">${MUSCLE[r.muscle] || ''} · ${EQUIP[r.equipment] || ''}</div></div><button class="x" onclick="del('ExerciseLibrary','${r.id}');customList()">${IC.x}</button></div>`).join('') || '<div class="empty">Chưa có bài tự tạo</div>'}</div>
     <button class="btn" style="margin-top:12px" onclick="customExSheet()">+ Tạo bài mới</button>`);
 }
 function logout() {
@@ -720,7 +721,7 @@ function drawLogin() {
   $('#title').textContent = ''; $('#title').removeAttribute('aria-label'); $('#fab').classList.add('hide'); setSync('off'); $('#tabs').style.display = 'none';
   $('#screen').innerHTML = `<form class="login" onsubmit="login(this);return false">
     <div class="logo">${IC.dumb}</div>
-    <h1 id="hello" style="font:400 34px/1.15 var(--display);margin:0 0 24px"></h1>
+    <h1 id="hello" style="font:400 36px/1.3 var(--display);letter-spacing:.01em;margin:0 0 28px"></h1>
     <label class="field"><span>Mật khẩu</span><input class="in" name="key" type="password" autocomplete="current-password" required autofocus></label>
     <button class="btn" id="lbtn">Vào app</button></form>`;
   blurIn($('#hello'), 'Xin chào ' + OWNER);
